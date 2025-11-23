@@ -1,0 +1,65 @@
+<div
+  class="task-card"
+  (click)="goToDetail()"
+  [ngClass]="{ highlight: highlight }"
+>
+  <i class="fa-regular fa-clipboard"></i>
+  <div class="content">
+    <div class="task-desp">
+      <div class="task-title">{{ viecdagiao.title }}</div>
+      <div class="task-meta">
+        <button class="desp-button m-r-10">
+          📅
+          <ng-container *ngIf="viecdagiao.startDate; else dueDate">
+            {{ convertDate(viecdagiao.startDate) }}
+            -
+            {{ convertDate(viecdagiao.dueDate) }}
+          </ng-container>
+          <ng-template #dueDate>Lỗi thời hạn</ng-template>
+        </button>
+        <div class="progress-bar">
+          <!-- <nz-progress
+            [nzPercent]="viecdagiao.percentageComplete.toFixed(2)"
+            nzStatus="active"
+          ></nz-progress> -->
+        </div>
+        <div (click)="$event.stopPropagation(); $event.preventDefault()">
+          <a nz-dropdown nzTrigger="click" [nzDropdownMenu]="menu">
+            <div class="center-flex">
+              <ng-container *ngIf="frequency && frequency.frequency_type; else defaultTag">
+  <div class="desp-button">
+    📆 Lịch báo cáo theo {{ frequency.frequency_type }}
+  </div>
+</ng-container>
+              <ng-template #defaultTag>
+                <div class="sub-title">Lỗi hiển thị lịch báo cáo</div>
+              </ng-template>
+            </div>
+          </a>
+          <nz-dropdown-menu #menu="nzDropdownMenu" #menuRef="nzDropdownMenu">
+            <div class="assign-dropdown" nz-menu>
+              <app-select-repeat-schedule
+                [isEdit]="false"
+                [initValue]="frequency"
+              ></app-select-repeat-schedule>
+            </div>
+          </nz-dropdown-menu>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="task-actions">
+    <button class="border"
+      nz-button
+      nzType="primary"
+      (click)="togglePopup(); $event.stopPropagation(); $event.preventDefault()"
+    >
+      Cập nhật
+    </button>
+  </div>
+</div>
+<app-modal-update-progress
+  [taskId]="viecdagiao.taskId"
+  *ngIf="isOpenPopup"
+  (closePopup)="onchildChangedShowPopup($event)"
+></app-modal-update-progress>

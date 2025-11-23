@@ -1,0 +1,51 @@
+<nz-modal
+  [(nzVisible)]="isVisible"
+  nzTitle="Nhắc nhở công việc"
+  (nzOnCancel)="handleCancel()"
+  (nzOnOk)="handleOk()"
+  [nzContent]="modalContent"
+  [nzFooter]="modalFooter"
+>
+  <ng-template #modalContent>
+    <!-- <div class="title">Công việc</div>
+    <div class="space-10px"></div> -->
+
+    <!-- <app-select-multi-unit></app-select-multi-unit> -->
+    <!-- <nz-select
+      nzShowSearch
+      nzAllowClear
+      [(ngModel)]="selectedTitle"
+      [nzDropdownRender]="renderTemplate"
+      nzPlaceHolder="-- Tiêu đề --"
+    >
+      @for (item of listOfItem; track item) {
+      <nz-option [nzLabel]="item" [nzValue]="item"></nz-option>
+      }
+    </nz-select>
+    <ng-template #renderTemplate>
+      <nz-divider></nz-divider>
+      <div class="container">
+        <input type="text" nz-input #inputElement />
+        <a class="add-item" (click)="addItem(inputElement)">
+          <nz-icon nzType="plus" />
+          Thêm
+        </a>
+      </div>
+    </ng-template> -->
+    <div class="space-10px"></div>
+    <div class="title">Tin nhắn</div>
+
+    <textarea rows="4" nz-input [(ngModel)]="messageValue"></textarea>
+  </ng-template>
+  <ng-template #modalFooter>
+    <button nz-button nzType="default" (click)="handleCancel()">Hủy bỏ</button>
+    <button
+      nz-button
+      nzType="primary"
+      (click)="handleOk()"
+      [nzLoading]="isOkLoading"
+    >
+      Xác nhận
+    </button>
+  </ng-template>
+</nz-modal>

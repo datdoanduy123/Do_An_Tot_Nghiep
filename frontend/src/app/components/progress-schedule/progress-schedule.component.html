@@ -1,0 +1,186 @@
+<div class="progress-schedule-container">
+  <div class="schedule-header">
+    <h3>Lịch trình tiến độ công việc</h3>
+    <span class="user-info" *ngIf="userName">
+      <i class="fa-solid fa-user"></i> {{ userName }}
+    </span>
+  </div>
+
+  <nz-table 
+    #basicTable 
+    [nzData]="progressPeriods" 
+    [nzLoading]="isLoading"
+    [nzShowPagination]="false"
+    nzSize="small"
+    class="progress-table">
+    <thead>
+      <tr>
+        <th nzWidth="80px">Kỳ</th>
+        <th nzWidth="150px">Thời gian</th>
+        <th nzWidth="120px">Trạng thái</th>
+        <th nzWidth="150px">Kết quả</th>
+        <th nzWidth="150px">Kiến nghị</th>
+        <th nzWidth="150px">Feedback</th>
+        <th nzWidth="150px">File đính kèm</th>
+        <th nzWidth="150px">Cập nhật lúc</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr *ngFor="let period of progressPeriods" 
+          [class.completed-row]="period.status === 'completed'"
+          [class.pending-row]="period.status === 'Chưa có báo cáo cho mốc này'"
+          [class.in-progress-row]="period.status === 'in_progress'">
+        
+        <!-- Kỳ -->
+        <td>
+          <div class="period-info">
+            <span class="period-index">Kỳ {{ period.periodIndex }}</span>
+          </div>
+        </td>
+
+        <!-- Thời gian -->
+        <td>
+          <div class="date-range">
+            <div class="date-item">
+              <i class="fa-solid fa-calendar-day"></i>
+              <span>{{ formatDate(period.periodStartDate) }}</span>
+            </div>
+            <div class="date-separator">đến</div>
+            <div class="date-item">
+              <i class="fa-solid fa-calendar-check"></i>
+              <span>{{ formatDate(period.periodEndDate) }}</span>
+            </div>
+          </div>
+        </td>
+
+        <!-- Trạng thái -->
+        <td>
+          <nz-tag [nzColor]="getStatusColor(period.status)" class="status-tag">
+            <i class="fa-solid fa-circle-info" *ngIf="period.status === 'in_progress'"></i>
+            <i class="fa-solid fa-check-circle" *ngIf="period.status === 'completed'"></i>
+            <i class="fa-solid fa-exclamation-circle" *ngIf="period.status === 'Chưa có báo cáo cho mốc này'"></i>
+            {{ getStatusText(period.status) }}
+          </nz-tag>
+        </td>
+
+        <!-- Kết quả -->
+        <td>
+          <div class="content-cell">
+            <span 
+              *ngIf="period.result && hasReport(period); else noResult"
+              class="report-content"
+              [nz-tooltip]="period.result"
+              nzTooltipPlacement="top">
+              {{ period.result.length > 50 ? (period.result | slice:0:50) + '...' : period.result }}
+            </span>
+            <ng-template #noResult>
+              <span class="no-data">
+                <i class="fa-solid fa-minus"></i> Chưa có
+              </span>
+            </ng-template>
+          </div>
+        </td>
+
+        <!-- Kiến nghị -->
+        <td>
+          <div class="content-cell">
+            <span 
+              *ngIf="period.proposal && hasReport(period); else noProposal"
+              class="report-content"
+              [nz-tooltip]="period.proposal"
+              nzTooltipPlacement="top">
+              {{ period.proposal.length > 50 ? (period.proposal | slice:0:50) + '...' : period.proposal }}
+            </span>
+            <ng-template #noProposal>
+              <span class="no-data">
+                <i class="fa-solid fa-minus"></i> Chưa có
+              </span>
+            </ng-template>
+          </div>
+        </td>
+
+        <!-- Feedback -->
+        <td>
+          <div class="content-cell">
+            <span 
+              *ngIf="period.feedback && hasReport(period); else noFeedback"
+              class="report-content"
+              [nz-tooltip]="period.feedback"
+              nzTooltipPlacement="top">
+              {{ period.feedback.length > 50 ? (period.feedback | slice:0:50) + '...' : period.feedback }}
+            </span>
+            <ng-template #noFeedback>
+              <span class="no-data">
+                <i class="fa-solid fa-minus"></i> Chưa có
+              </span>
+            </ng-template>
+          </div>
+        </td>
+
+        <!-- File đính kèm -->
+        <td>
+          <div class="file-cell">
+            <button 
+              *ngIf="period.fileName && period.filePath && hasReport(period); else noFile"
+              nz-button 
+              nzType="link" 
+              nzSize="small"
+              (click)="downloadFile(period.filePath!, period.fileName!)"
+              nz-tooltip="Click để tải file"
+              nzTooltipPlacement="top"
+              class="file-download-btn">
+              <i nz-icon nzType="download"></i>
+              {{ period.fileName.length > 20 ? (period.fileName | slice:0:20) + '...' : period.fileName }}
+            </button>
+            <ng-template #noFile>
+              <span class="no-data">
+                <i class="fa-solid fa-file-slash"></i> Chưa có file
+              </span>
+            </ng-template>
+          </div>
+        </td>
+
+        <!-- Cập nhật lúc -->
+        <td>
+          <div class="update-cell">
+            <div *ngIf="hasReport(period); else noUpdate" class="update-info">
+              <div class="update-date">
+                <i class="fa-solid fa-clock"></i>
+                {{ formatDate(period.updatedAt!) }}
+              </div>
+              <div class="update-by" *ngIf="period.updateByName">
+                <i class="fa-solid fa-user"></i>
+                <small>{{ period.updateByName }}</small>
+              </div>
+            </div>
+            <ng-template #noUpdate>
+              <span class="no-data">
+                <i class="fa-solid fa-calendar-times"></i> Chưa cập nhật
+              </span>
+            </ng-template>
+          </div>
+        </td>
+      </tr>
+    </tbody>
+  </nz-table>
+
+  <!-- Thông tin tổng hợp -->
+  <!-- <div class="summary-info" *ngIf="progressPeriods.length > 0">
+    <div class="summary-item">
+      <span class="summary-label">Tổng số kỳ:</span>
+      <span class="summary-value">{{ progressPeriods.length }}</span>
+    </div>
+    <div class="summary-item">
+      <span class="summary-label">Đã hoàn thành:</span>
+      <span class="summary-value completed">
+        {{ progressPeriods.filter(p => p.status === 'completed').length }}
+      </span>
+    </div> 
+    <div class="summary-item">
+      <span class="summary-label">Chưa nộp:</span>
+      <span class="summary-value pending">
+        {{ progressPeriods.filter(p => p.status === 'Chưa có báo cáo cho mốc này').length }}
+      </span>
+    </div>
+  </div> -->
+</div>

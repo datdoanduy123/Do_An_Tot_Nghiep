@@ -1,0 +1,27 @@
+<a
+  nz-dropdown
+  nzTrigger="click"
+  [nzDropdownMenu]="menu"
+  [nzVisible]="dropdownVisible"
+  (nzVisibleChange)="dropdownVisible = $event"
+>
+  <div class="desp-button assign">
+    <ng-container *ngIf="frequencySelected; else defaultTag">
+      <span class="center-flex" style="font-size: 14px">
+        Lịch báo cáo theo {{ frequencySelected.frequency_type }}
+      </span>
+    </ng-container>
+    <ng-template #defaultTag>
+      <div class="sub-title">Bấm để chọn</div>
+    </ng-template>
+  </div>
+</a>
+<nz-dropdown-menu #menu="nzDropdownMenu" #menuRef="nzDropdownMenu">
+  <div class="assign-dropdown" nz-menu>
+    <app-select-repeat-schedule
+      [isEdit]="isEdit"
+      [initValue]="frequency"
+      (frequency)="getfrequency($event)"
+    ></app-select-repeat-schedule>
+  </div>
+</nz-dropdown-menu>

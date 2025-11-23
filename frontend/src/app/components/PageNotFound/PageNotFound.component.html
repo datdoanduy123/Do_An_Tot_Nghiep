@@ -1,0 +1,32 @@
+<!-- <div class="not-found-container">
+  <div class="not-found-content">
+    <h1 class="error-code">404</h1>
+    <h2 class="error-title">Oops! Page Not Found</h2>
+    <p class="error-message">
+      The page you are looking for might have been removed, had its name
+      changed, or is temporarily unavailable.
+    </p>
+    <div class="action-buttons">
+      <button class="btn btn-primary" [routerLink]="['/viecduocgiao']">
+        Go to Home
+      </button>
+      <button class="btn btn-outline-primary" (click)="goBack()">
+        Go Back
+      </button>
+    </div>
+  </div>
+</div> -->
+<nz-result
+  nzStatus="404"
+  nzTitle="404"
+  nzSubTitle="Xin lỗi, Trang bạn truy cập không tồn tại !"
+>
+  <div nz-result-extra>
+    <button (click)="goBack()" nz-button nzType="primary">
+      Trở về trang trước
+    </button>
+    <button [routerLink]="['/viecduocgiao']" nz-button nzType="primary">
+      Trở về trang ban đầu
+    </button>
+  </div>
+</nz-result>

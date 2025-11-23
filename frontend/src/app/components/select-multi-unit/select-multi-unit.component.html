@@ -1,0 +1,43 @@
+<div class="select-unit">
+  <div class="flex-column-start">
+    <div class="flex-column-start">
+      <nz-select
+        [nzMaxTagCount]="3"
+        [nzMaxTagPlaceholder]="tagPlaceHolder"
+        nzMode="multiple"
+        nzPlaceHolder="-- Chọn đơn vị --"
+        [(ngModel)]="listOfSelectedBo"
+        (ngModelChange)="onBoChange()"
+      >
+        @for (item of units; track item) {
+        <nz-option
+          [nzLabel]="item.unitName"
+          [nzValue]="item.unitId"
+        ></nz-option>
+        }
+      </nz-select>
+      <ng-template #tagPlaceHolder let-selectedList
+        >và {{ selectedList.length }} lựa chọn khác</ng-template
+      >
+    </div>
+    <!-- <div class="space-10px"></div>
+
+    <div class="flex-column-start">
+      <nz-select
+        [nzMaxTagCount]="3"
+        [nzMaxTagPlaceholder]="tagPlaceHolder"
+        nzMode="multiple"
+        nzPlaceHolder="-- Chọn phòng ban --"
+        [(ngModel)]="listOfSelectedPhongBan"
+        (nzOpenChange)="onUnitChange()"
+      >
+        @for (item of filteredPhongBans; track item) {
+        <nz-option [nzLabel]="item" [nzValue]="item"></nz-option>
+        }
+      </nz-select>
+      <ng-template #tagPlaceHolder let-selectedList
+        >và {{ selectedList.length }} lựa chọn khác</ng-template
+      > -->
+    <!-- </div> -->
+  </div>
+</div>

@@ -1,0 +1,35 @@
+<nz-modal
+  [(nzVisible)]="isVisible"
+  nzTitle="Chọn lịch trình"
+  [nzFooter]="modalFooter"
+  [nzContent]="modalContent"
+  (nzOnCancel)="closeModal()"
+>
+  <ng-template #modalContent class="datetimepicker-container">
+    <div class="date-time-group">
+      <div class="date-time-row">
+        <nz-time-picker
+          class="m-r-10"
+          [(ngModel)]="startTime"
+          nzPlaceHolder="Thời gian bắt đầu"
+          nzFormat="HH:mm"
+        ></nz-time-picker>
+        <nz-time-picker
+          [(ngModel)]="endTime"
+          nzPlaceHolder="Thời gian kết thúc"
+          nzFormat="HH:mm"
+        ></nz-time-picker>
+      </div>
+      <nz-range-picker
+        [(ngModel)]="date"
+        (ngModelChange)="onChange($event)"
+      ></nz-range-picker>
+    </div>
+  </ng-template>
+  <ng-template #modalFooter>
+    <button nz-button nzType="default" (click)="closeModal()">Hủy bỏ</button>
+    <button nz-button nzType="primary" (click)="SubmitSelect()">
+      Xác nhận
+    </button>
+  </ng-template>
+</nz-modal>

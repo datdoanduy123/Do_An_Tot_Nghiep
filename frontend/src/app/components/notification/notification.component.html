@@ -1,0 +1,92 @@
+<a nz-dropdown nzTrigger="click" [nzDropdownMenu]="menu">
+  <div class="notification-icon">
+    <i class="fa-solid fa-bell"></i>
+    @if(totalNotificationIsNotRead  > 0) {
+    <span class="badge" 
+    [class.badge--large]="totalNotificationIsNotRead > 99">
+    {{ totalNotificationIsNotRead > 99 ? '99+' : totalNotificationIsNotRead }}
+    </span>
+    }
+  </div>
+</a>
+<nz-dropdown-menu #menu="nzDropdownMenu">
+  <div class="notification-container" 
+  infiniteScroll
+  [infiniteScrollDistance]="2"
+  [infiniteScrollThrottle]="500"
+  [scrollWindow]="false"
+  (scrolled)="onScroll()">
+    <div class="activity-header">
+      <h2>Thông báo</h2>
+      <!-- <div>
+        <i
+          nz-tooltip
+          nzTooltipTitle="Đánh dấu tất cả là đã đọc"
+          nzTooltipColor="#f44336"
+          class="fa-solid fa-list-check icon-check-noti"
+        ></i>
+        <span class="icon">⚙️</span> 
+      </div> -->
+    </div>
+    <div class="activity-date">{{ dateTimeNow }}</div>
+    <div *ngIf="isEmptlist">
+      <app-page-empty></app-page-empty>
+    </div>
+    @if(allNotifications.length > 0) {
+
+    
+    <!-- @for(r of realtimeNotifications; track r.timestamp + '-' + $index) {
+      <div (click)="markNotificationRead(r);"
+      class="notification-item"
+      [ngClass]="{unread : isReadd}"
+      nz-menu-item>
+    <div class="icon m-r-10">📋</div>
+    <div class="text">
+      <div>
+        <p [innerHtml]="formatMessage(r)">{{r.message}}</p>
+      </div>
+      <span class="time">{{getTimeAgo(r.timestamp)}}</span>
+    </div>    
+      </div>
+    }
+  }
+  @let list = (data$ | async);
+
+@if(list && list.items.length > 0) {
+  @for(item of list.items; track item.reminderId) {
+    <div
+      (click)="onNotificationClick(item)"
+      class="notification-item"
+      [ngClass]="{ unread: !item.isRead }"    
+      nz-menu-item>
+      <div class="icon m-r-10">📋</div>
+      <div class="text">
+        <div>
+          <p [innerHtml]="formatMessage(item)">{{item.message}}</p>
+
+          
+        </div>
+        <span class="time">{{getTimeAgo(item.createdAt)}}</span>
+      </div>
+    </div>
+  } -->
+   @for (item of allNotifications; track item.reminderId) {
+  <div
+    class="notification-item"
+     [ngClass]="{unread : !item.isRead}"
+    (click)="onNotificationClick(item)"
+    nz-menu-item>
+      <div class="icon m-r-10">📋</div>
+  <div class="text">
+    <p [innerHTML]="formatMessage(item)"></p>
+    <small>{{ getTimeAgo(item.createdAt) }}</small>
+    </div>
+  </div>
+}
+
+}
+@else {
+  <div class="empty">Không có thông báo nào</div>
+}
+  </div>
+</nz-dropdown-menu>

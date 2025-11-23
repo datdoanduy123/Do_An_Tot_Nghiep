@@ -1,0 +1,26 @@
+<nz-modal
+  [(nzVisible)]="isVisible"
+  nzTitle="Xét duyệt báo cáo"
+  (nzOnCancel)="handleCancel()"
+  (nzOnOk)="handleOk()"
+  [nzContent]="modalContent"
+  [nzFooter]="modalFooter"
+>
+  <ng-template #modalContent>
+    <div class="space-10px"></div>
+    <div class="title">Tin nhắn</div>
+
+    <textarea rows="4" nz-input [(ngModel)]="messageValue"></textarea>
+  </ng-template>
+  <ng-template #modalFooter>
+    <button nz-button nzType="default" (click)="handleCancel()">Hủy bỏ</button>
+    <button
+      nz-button
+      nzType="primary"
+      (click)="handleOk()"
+      [nzLoading]="isOkLoading"
+    >
+      Xác nhận
+    </button>
+  </ng-template>
+</nz-modal>

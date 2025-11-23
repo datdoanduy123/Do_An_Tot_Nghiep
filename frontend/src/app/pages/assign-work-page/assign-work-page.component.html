@@ -1,0 +1,163 @@
+<div class="modal-assign-work">
+  <div class="modal-header">
+    <div class="title">Giao việc</div>
+    <div class="button-group">
+      <button
+        nz-button
+        nzType="primary"
+        (click)="showModalAddJob()">
+        Tạo việc gốc
+      </button>
+
+       <button
+        nz-button
+        nzType="default"
+        (click)="showModalAiTaskGenerator()"
+        class="action-btn ai-btn">
+        Tạo việc với AI
+      </button>
+    </div>
+  </div>
+  <div class="task-group">
+    <!-- <div style="text-align: end; width: 98.5%"></div> -->
+    <nz-collapse nzGhost>
+      <ng-container *ngFor="let task of parentTasks">
+        <ng-template #renderHeader>
+          <div class="title-collapse">
+            <input
+              spellcheck="false"
+              [(ngModel)]="task.title"
+              class="inline-edit-input task-title"
+              (click)="$event.stopPropagation()"
+              disabled="true"
+            />
+            <div class="delete-actions">
+              <button (click)="showAddJob()" nz-button nzType="primary">
+                Tạo việc con
+              </button>
+            </div>
+          </div>
+          <ng-container *ngFor="let child of getChildTasks(task.id)">
+            <app-misson-item
+              [task]="child"
+              (removetask)="removeTask($event)"
+            ></app-misson-item>
+          </ng-container>
+        </ng-template>
+        
+        <nz-collapse-panel [nzHeader]="renderHeader">
+          @if(isShowAddJob) {
+          <edit-app-misson-item
+          *ngIf="task?.id"
+            [taskIdParent]="task.id"
+            (closeEdit)="closeAddJob()"
+            (childCreated)="handleChildCreated($event)">
+          </edit-app-misson-item>
+           <div style="display: flex; justify-content: flex-end; margin-top: 12px;">
+  <!-- <button
+    nz-button
+    nzType="primary"
+    nz-popover
+    nzPopoverTitle="Bạn chắc chắn muốn giao việc ?"
+    [nzPopoverContent]="popTplConfirm"
+[(nzPopoverVisible)]="visiblePopoverConfirmMap[task.id]"
+    nzPopoverTrigger="click">
+    Xác nhận giao việc 1
+  </button> -->
+</div>
+
+<!--  -->
+  <ng-template #popTplConfirm>
+    <div style="max-width: 200px">
+      <p>Hành động này sẽ không thể hoàn tác ?</p>
+      <div
+        class="custom-footer"
+        style="display: flex; justify-content: end; margin-top: 8px"
+      >
+        <button
+          nz-button
+          nzSize="small"
+          (click)="onCancelConfirmGiaoViec(task.id)"
+          style="margin-right: 8px"
+        >
+          Huỷ
+        </button>
+        <button
+          nz-button
+          nzType="primary"
+          nzSize="small"
+          (click)="confirmGiaoViec(task.id)"
+        >
+          Xác nhận
+        </button>
+      </div>
+    </div>
+  </ng-template>
+}
+  <!-- <ng-container *ngTemplateOutlet="modalFooter2"></ng-container> -->
+
+        
+        <!-- <ng-template #modalFooter2>
+      <button
+        nz-button
+        nzType="primary"
+        nz-popover
+        nzPopoverTitle="Bạn chắc chắn muốn giao việc ?"
+        [nzPopoverContent]="popTplConfirm"
+        [(nzPopoverVisible)]="visiblePopoverConfirmGiaoViec"
+        nzPopoverTrigger="click"
+      >
+        Xác nhận giao việc
+      </button>
+      <ng-template #popTplConfirm>
+        <div style="max-width: 200px">
+          <p>Hành động này sẽ không thể hoàn tác ?</p>
+          <div
+            class="custom-footer"
+            style="display: flex; justify-content: end; margin-top: 8px"
+          >
+            <button
+              nz-button
+              nzSize="small"
+              (click)="onCancelConfirmGiaoViec()"
+              style="margin-right: 8px"
+            >
+              Huỷ
+            </button>
+            <button
+              nz-button
+              nzType="primary"
+              nzSize="small"
+              (click)="confirmGiaoViec()"
+            >
+              Xác nhận
+            </button>
+          </div>
+        </div>
+      </ng-template>
+  </ng-template> -->
+          
+        </nz-collapse-panel>
+      </ng-container>
+    </nz-collapse>
+  </div>
+  
+
+  <!-- AI Task Generator Component -->
+  <!-- <app-ai-task-generator
+     [isVisible]="showAiGenerator"
+   (tasksGenerated)="handleAiTasksGenerated($event)"
+    (parentTaskAssigned)="handleAiParentTaskAssigned($event)"
+    (taskAssigned)="handleAiTaskAssigned($event)"
+    (closeGenerator)="hideAiGenerator()">
+  </app-ai-task-generator>
+
+    -->
+
+  
+</div>
+
+<app-modal-add-job
+  [listTask]="parentTasks"
+  (jobAdded)="handleJobAdded($event)">
+</app-modal-add-job>

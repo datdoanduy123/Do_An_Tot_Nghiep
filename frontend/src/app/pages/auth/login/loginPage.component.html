@@ -1,0 +1,75 @@
+<div class="auth-container">
+  <div class="auth-box">
+    <div class="auth-header">
+      <h2>Đăng nhập</h2>
+    </div>
+
+    <form [formGroup]="authForm" (ngSubmit)="onSubmit()" class="auth-form" novalidate>
+      <!-- Username -->
+      <div class="form-group">
+        <label for="username">Tên đăng nhập</label>
+        <input
+          type="text"
+          id="username"
+          formControlName="userName"
+          placeholder="Nhập tên đăng nhập"
+          class="auth-input"
+          autocomplete="username"
+        />
+        <div *ngIf="userName?.invalid && userName?.touched" class="text-error">
+          Tên đăng nhập là bắt buộc
+        </div>
+      </div>
+
+      <!-- Password -->
+      <div class="form-group password-group">
+        <label for="password">Mật khẩu</label>
+        <div class="input-wrapper">
+          <input
+            [type]="passwordVisible ? 'text' : 'password'"
+            id="password"
+            formControlName="password"
+            placeholder="Nhập mật khẩu"
+            class="auth-input"
+            autocomplete="current-password"
+          />
+       <button
+  type="button"
+  class="toggle-password"
+  (click)="passwordVisible = !passwordVisible"
+  aria-label="Hiện/Ẩn mật khẩu"
+>
+  <i
+    nz-icon
+    [nzType]="passwordVisible ? 'eye-invisible' : 'eye'"
+    style="font-size: 20px; cursor: pointer;"
+  ></i>
+      </button>
+         </div>
+
+        <div *ngIf="password?.invalid && password?.touched" class="text-error">
+          <div *ngIf="password?.errors?.['required']">Mật khẩu là bắt buộc</div>
+          <div *ngIf="password?.errors?.['minlength']">
+            Mật khẩu phải ít nhất {{ password?.errors?.['minlength'].requiredLength }} ký tự.
+            (Hiện tại bạn nhập {{ password?.errors?.['minlength'].actualLength }} ký tự)
+          </div>
+        </div>
+      </div>
+
+      <button
+        type="submit"
+        [disabled]="!authForm.valid || isLoading"
+        class="auth-button"
+      >
+        Đăng nhập
+      </button>
+    </form>
+
+    <div class="forgot-password">
+      <a routerLink="/forgot-password">Quên mật khẩu?</a>
+    </div>
+  </div>
+</div>
+
+<app-toast></app-toast>
+<screen-loading *ngIf="isLoading"></screen-loading>

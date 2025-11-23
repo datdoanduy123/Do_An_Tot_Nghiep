@@ -1,0 +1,33 @@
+<!-- src/app/pages/assign-work-page/create-ai-job-page/create-ai-job-page.component.html -->
+<div class="create-ai-job-page">
+  <!-- Header -->
+  <div class="page-header">
+    <div class="header-left">
+      <button 
+        nz-button 
+        nzType="text" 
+        nzSize="large"
+        (click)="goBack()"
+        class="back-btn">
+        <i nz-icon nzType="arrow-left"></i>
+
+      </button>
+      
+      <div class="page-title">
+        <h1>Tạo việc với AI</h1>
+        
+      </div>
+    </div>
+  </div>
+
+  <!-- AI Task Generator - Full Screen -->
+  <div class="ai-generator-container">
+    <app-ai-task-generator
+      [isVisible]="true"
+      (tasksGenerated)="handleAiTasksGenerated($event)"
+      (parentTaskAssigned)="handleAiParentTaskAssigned($event)"
+      (taskAssigned)="handleAiTaskAssigned($event)"
+      (closeGenerator)="handleAiGeneratorClosed()">
+    </app-ai-task-generator>
+  </div>
+</div>

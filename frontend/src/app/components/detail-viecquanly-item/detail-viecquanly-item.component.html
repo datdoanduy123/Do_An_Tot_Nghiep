@@ -1,0 +1,263 @@
+<div class="detailviecquanly-card">
+  <i class="fa-regular fa-clipboard"></i>
+  <div class="content">
+    <div class="task-title">{{ detailViecquanlyModel.Title }}</div>
+    <div class="description">
+      <button class="desp-button">
+        📅
+        <ng-container
+          *ngIf="
+            detailViecquanlyModel.StartDate && detailViecquanlyModel.DueDate;
+            else dueDate
+          "
+        >
+          {{ convertDate(detailViecquanlyModel.StartDate) }}
+          -
+          {{ convertDate(detailViecquanlyModel.DueDate) }}
+        </ng-container>
+        <ng-template #dueDate>Lỗi thời hạn</ng-template>
+      </button>
+      <div class="container-button-assignUser">
+        <div
+          class="desp-button"
+          nz-popover
+          nzPopoverTitle="Người/Đơn vị thực hiện"
+          nzPopoverTrigger="click"
+          [nzPopoverContent]="contentTemplate">
+          👥 Người thực hiện
+        </div>
+        <ng-template #contentTemplate>
+          <ul nz-menu class="assignee-list">
+            <li nz-menu-item *ngFor="let assignee of allAssignees" 
+                [ngClass]="'assignee-' + assignee.type">
+              
+              <!-- User assignee -->
+              <ng-container *ngIf="assignee.type === 'user'">
+            
+                <span class="assignee-name">{{ assignee.name }}</span>
+                <!-- <span class="assignee-type-badge user-badge">Cá nhân</span> -->
+              </ng-container>
+
+              <!-- Unit assignee -->
+              <ng-container *ngIf="assignee.type === 'unit'">
+               
+                <div class="unit-info">
+                  <span class="assignee-name">{{ assignee.name }}</span>
+                  <!-- <small class="unit-org" *ngIf="assignee.org">{{ assignee.org }}</small> -->
+                </div>
+                <span class="assignee-type-badge unit-badge">Đơn vị</span>
+              </ng-container>
+            </li>
+            
+            <li nz-menu-item *ngIf="!hasAssignees" class="empty-assignee">
+              <nz-icon nzType="exclamation-circle" style="color: #faad14; margin-right: 8px;"></nz-icon>
+              Chưa có người/đơn vị thực hiện
+            </li>
+          </ul>
+        </ng-template>
+      </div>
+      <div class="container-button-frequency">
+        <a nz-dropdown nzTrigger="click" [nzDropdownMenu]="menu">
+          <div class="center-flex">
+            <ng-container
+              *ngIf="
+                frequency?.frequency_type != null ||
+                  frequency?.frequency_type != '';
+                else defaultTag
+              "
+            >
+              <div class="desp-button">
+                📆 Lịch báo cáo theo {{ frequency?.frequency_type }}
+              </div>
+            </ng-container>
+            <ng-template #defaultTag>
+              <div class="sub-title">Lỗi hiển thị lịch báo cáo</div>
+            </ng-template>
+          </div>
+        </a>
+        <nz-dropdown-menu #menu="nzDropdownMenu" #menuRef="nzDropdownMenu">
+          <div class="assign-dropdown" nz-menu>
+            <app-select-repeat-schedule
+              [isEdit]="false"
+              [initValue]="frequency"
+            ></app-select-repeat-schedule>
+          </div>
+        </nz-dropdown-menu>
+      </div>
+      <div class="container-button-desp">
+        <div class="desp-button" (click)="showModalDesp()">
+          <span> 🔍 Nội dung </span>
+        </div>
+      </div>
+      <div class="progress-bar">
+        <nz-progress
+          [nzPercent]="detailViecquanlyModel.PercentageComplete.toFixed(2)"
+          nzStatus="active"
+        ></nz-progress>
+      </div>
+    </div>
+  </div>
+  <div class="viecquanly-actions">
+    <div>
+      <button class="border"
+        style="
+          background: #40a9ff !important;
+          min-width: 112px !important;
+          border-color: #40a9ff !important;
+        "
+        nz-button
+        nzType="primary"
+        (click)="goReviewPage()"
+      >
+        Rà soát
+      </button>
+    </div>
+    <div class="flex">
+      <button
+        style="
+          background: rgb(0, 156, 0) !important;
+          border-color: rgb(0, 156, 0) !important;
+          margin-right: 5px;
+        "
+        nz-button
+        nzType="primary"
+        class="m-b-10 border"
+        (click)="showModalEdit()"
+      >
+        Sửa
+      </button>
+      <div class="delete-container">
+  <button
+    nz-button
+    nzType="primary"
+    class="btn-delete border"
+    (click)="toggleConfirm()"
+  >
+    Xóa
+  </button>
+
+  <div class="confirm-box" *ngIf="showConfirm">
+    <button nz-button nzSize="small" (click)="cancelDelete()">Huỷ</button>
+    <button
+      nz-button
+      nzType="primary"
+      nzSize="small"
+      (click)="confirmDelete()"
+    >
+      Xác nhận
+    </button>
+  </div>
+</div>
+
+    </div>
+  </div>
+</div>
+
+<app-modal-detail-progress-child-job
+  *ngIf="isShowDetailProgressModal"
+  [taskId]="detailViecquanlyModel.TaskId.toString()"
+  (isShowModal)="toggleShowDetailProgressModal()"
+></app-modal-detail-progress-child-job>
+<app-modal-detail-despcription-job
+  [desp]="detailViecquanlyModel.Description"
+></app-modal-detail-despcription-job>
+<nz-modal
+  [(nzVisible)]="isVisibleModalEdit"
+  nzTitle="Sửa công việc"
+  (nzOnCancel)="handleCancel()"
+  (nzOnOk)="handleEdit()"
+  [nzContent]="modalContent"
+  [nzFooter]="modalFooter"
+>
+  <ng-template #modalContent>
+    <div class="edit-title m-b-10">
+      <div class="flex m-b-10">
+        <span class="title">Tên công việc </span>
+        <nz-switch
+          [(ngModel)]="isEditTitleTask"
+          [nzCheckedChildren]="checkedTemplate"
+          [nzUnCheckedChildren]="unCheckedTemplate"
+        ></nz-switch>
+      </div>
+
+      <div>
+        <input
+          *ngIf="isEditTitleTask"
+          spellcheck="false"
+          [(ngModel)]="objectEdit.title"
+          class="inline-edit-input"
+        />
+      </div>
+    </div>
+    <div class="edit-title m-b-10">
+      <div class="flex m-b-10">
+        <span class="title">Nội dung công việc </span>
+        <nz-switch
+          [(ngModel)]="isEditDespTask"
+          [nzCheckedChildren]="checkedTemplate"
+          [nzUnCheckedChildren]="unCheckedTemplate"
+        ></nz-switch>
+      </div>
+      <div style="flex: 1">
+        <textarea
+          *ngIf="isEditDespTask"
+          nz-input
+          placeholder=""
+          [(ngModel)]="objectEdit.despcription"
+          [nzAutosize]="{ minRows: 3, maxRows: 10 }"
+        ></textarea>
+      </div>
+    </div>
+    <!--  -->
+    <div class="edit-title">
+      <div class="flex m-b-10">
+        <div class="title m-b-5">Chọn thời hạn</div>
+        <nz-switch
+          [(ngModel)]="isEditDateTimeTask"
+          [nzCheckedChildren]="checkedTemplate"
+          [nzUnCheckedChildren]="unCheckedTemplate"
+        ></nz-switch>
+      </div>
+      <nz-range-picker
+        *ngIf="isEditDateTimeTask"
+        class="m-b-10"
+        [nzShowTime]="{ nzFormat: 'HH:mm' }"
+        nzFormat="yyyy-MM-dd HH:mm"
+        [(ngModel)]="selectedRange"
+        (ngModelChange)="onChangeDateModalEdit($event)"
+      ></nz-range-picker>
+    </div>
+    <!--  -->
+    <div class="edit-title">
+      <div class="flex m-b-10">
+        <div class="title m-b-5">Chọn kỳ báo cáo</div>
+        <nz-switch
+          [(ngModel)]="isEditFrequencyTask"
+          [nzCheckedChildren]="checkedTemplate"
+          [nzUnCheckedChildren]="unCheckedTemplate"
+        ></nz-switch>
+      </div>
+      <div>
+        <app-modal-assign-schedule
+          *ngIf="isEditFrequencyTask"
+          (frequencyOutput)="getFrequencySelected($event)"
+        ></app-modal-assign-schedule>
+      </div>
+    </div>
+    <!--  -->
+    <ng-template #checkedTemplate><nz-icon nzType="check" /></ng-template>
+    <ng-template #unCheckedTemplate><nz-icon nzType="close" /></ng-template>
+  </ng-template>
+  <ng-template #modalFooter>
+    <button nz-button nzType="default" (click)="handleCancel()">Hủy bỏ</button>
+    <button
+      nz-button
+      nzType="primary"
+      (click)="handleEdit()"
+      [nzLoading]="isOkLoading"
+    >
+      Xác nhận
+    </button>
+  </ng-template>
+</nz-modal>
+<!--  -->

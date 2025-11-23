@@ -1,0 +1,111 @@
+<div class="footer">
+  <nz-tabset
+    [nzAnimated]="false"
+    [nzSelectedIndex]="selectedTabIndex"
+    nzCentered
+    (nzSelectedIndexChange)="onTabChange($event)"
+  >
+    <!-- day -->
+    <nz-tab nzTitle="Ngày" [nzDisabled]="!isEdit">
+      <div>
+        <div class="select-day m-b-10">
+          <div class="title">Số ngày lặp lại</div>
+          <div class="flex">
+            <input
+              type="number"
+              class="m-r-5"
+              [(ngModel)]="repeatDay"
+              [min]="1"
+              [disabled]="!isEdit"
+            />
+            <div class="title">ngày</div>
+          </div>
+        </div>
+        <div class="title">
+          Lặp lại sau <span class="special">{{ repeatDay }}</span> ngày
+        </div>
+      </div>
+    </nz-tab>
+    <!-- week -->
+    <nz-tab nzTitle="Tuần" [nzDisabled]="!isEdit">
+      <div>
+        <div class="select-day-week m-b-10">
+          <button
+            *ngFor="let day of daysInWeek; let i = index"
+            class="week"
+            [class.active]="selectedDaysInWeekIndex.includes(day.index)"
+            (click)="isEdit && selectDaysInWeek(day.index)"
+          >
+            {{ day.title }}
+          </button>
+        </div>
+        <div class="flex-space-between m-b-10">
+          <div class="title">Số tuần lặp lại</div>
+          <div class="flex">
+            <input
+              type="number"
+              class="m-r-5"
+              [(ngModel)]="repeatWeek"
+              [min]="1"
+              [disabled]="!isEdit"
+            />
+            <div class="title">tuần</div>
+          </div>
+        </div>
+        <div class="title">
+          Lặp lại vào
+          <span class="special" *ngIf="selectedDaysInWeekIndex !== null">
+            {{ getSelectedDaysText() }}
+          </span>
+          hàng tuần, mỗi
+          <span *ngIf="repeatWeek">{{ repeatWeek }}</span>
+          tuần
+        </div>
+      </div>
+    </nz-tab>
+    <!-- month -->
+    <nz-tab nzTitle="Tháng" [nzDisabled]="!isEdit">
+      <div>
+        <div class="select-day m-b-10">
+          <div class="title">Vào ngày</div>
+          <div class="flex">
+            <input
+              type="number"
+              class="m-r-5"
+              [(ngModel)]="daysInMonth"
+              [min]="1"
+              [max]="31"
+              [disabled]="!isEdit"
+            />
+            <div style="width: 45px" class="title"></div>
+          </div>
+        </div>
+        <div class="flex-space-between m-b-10">
+          <div class="title">Số tháng lặp lại</div>
+          <div class="flex">
+            <input
+              type="number"
+              class="m-r-5"
+              [(ngModel)]="repeatMonth"
+              [min]="1"
+              [disabled]="!isEdit"
+            />
+            <div class="title">tháng</div>
+          </div>
+        </div>
+        <div class="title">
+          <ng-container>
+            Lặp lại vào ngày
+            <span class="special"> {{ daysInMonth }} </span>, mỗi
+            <span class="special" *ngIf="repeatMonth">{{ repeatMonth }}</span>
+            tháng
+          </ng-container>
+        </div>
+      </div>
+    </nz-tab>
+  </nz-tabset>
+  <div class="space-10px"></div>
+  <div *ngIf="isEdit" class="action">
+    <div (click)="submit()" class="btn">Xác nhận</div>
+  </div>
+</div>

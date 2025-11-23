@@ -1,0 +1,82 @@
+<div class="progress-origin-overlay">
+  <div class="modalProgressOriginalJob">
+    <div class="modalProgressOriginalJob-header">
+      <h2>📊 Chi tiết Tiến độ</h2>
+      <div class="btn-close" (click)="onClose()">✖</div>
+    </div>
+    <!-- <app-loading class="center-flex" *ngIf="isloading"></app-loading> -->
+    <div class="modalProgressOriginalJob-body">
+      <div class="info">
+        <p>
+          <strong>📝 Công việc gốc:</strong>
+          {{ detailProgressTaskParentModel?.taskName }}
+        </p>
+        <p>
+          <strong>⏳ Ngày bắt đầu:</strong>
+          <ng-container
+            *ngIf="detailProgressTaskParentModel?.startDate; else noDate"
+          >
+            {{ convertDateTime(detailProgressTaskParentModel?.startDate!) }}
+          </ng-container>
+          <ng-template #noDate></ng-template>
+        </p>
+        <p>
+          <strong>⏳ Hạn hoàn thành:</strong>
+          <ng-container
+            *ngIf="detailProgressTaskParentModel?.dueDate; else noDate"
+          >
+            {{ convertDateTime(detailProgressTaskParentModel?.dueDate!) }}
+          </ng-container>
+          <ng-template #noDate></ng-template>
+        </p>
+        <p>
+          <strong>✅ Trạng thái:</strong>
+          {{
+            convertStatusText(detailProgressTaskParentModel?.taskStatus ?? "")
+          }}
+        </p>
+      </div>
+
+      <div class="task-table">
+        <nz-table
+          #basicTable
+          [nzData]="detailProgressTaskParentModel?.children ?? []"
+          [nzLoading]="isloading"
+          nzTableLayout="fixed"
+          [nzPageSize]="5"
+        >
+          <thead>
+            <tr>
+              <th nzWidth="35px">STT</th>
+              <th nzWidth="100px">Tên việc con</th>
+              <th nzWidth="105px">Thời gian</th>
+              <th nzWidth="70px">Trạng thái</th>
+              <th nzWidth="50px">Tiến độ</th>
+              <th nzWidth="120px">Giao cho</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let vc of basicTable.data; let i = index">
+              <td>{{ i + 1 }}</td>
+              <td>{{ vc?.taskName ?? "" }}</td>
+              <td>
+                {{ convertDateTime(vc.startDate!) }} -
+                {{ convertDateTime(vc.dueDate!) }}
+              </td>
+              <td>{{ convertStatusText(vc?.taskStatus ?? "") }}</td>
+              <td>{{ vc.completionRate | number : "1.2-2" }}%</td>
+              <td>
+                {{
+                  vc.assigneeFullName.length
+                    ? vc.assigneeFullName.join(", ")
+                    : ""
+                }}
+              </td>
+            </tr>
+          </tbody>
+        </nz-table>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- [nzTotal]="totalItems" -->

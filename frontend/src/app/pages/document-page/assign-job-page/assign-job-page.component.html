@@ -1,0 +1,35 @@
+<div class="modal-assign-work">
+  <div class="modal-header">
+    <input [(ngModel)]="title" class="inline-edit-input task-title" />
+    <div>
+      <button class="btn cancel" (click)="goBack()">Hủy bỏ</button>
+    </div>
+    <div>
+      <button class="btn" (click)="showConfirm()">Hoàn thành</button>
+    </div>
+  </div>
+
+  <div class="task-group">
+    <!-- <nz-collapse nzGhost>
+      <ng-container *ngFor="let item of listTask; let i = index">
+        <ng-template #renderHeader>
+          <input
+            spellcheck="false"
+            [(ngModel)]="item.title"
+            class="inline-edit-input task-title"
+            (click)="$event.stopPropagation()"
+          />
+        </ng-template>
+        <nz-collapse-panel
+          [nzHeader]="renderHeader"
+          [nzActive]="panels[i].active"
+          [nzDisabled]="panels[i].disabled"
+        >
+          <ng-container *ngFor="let m of item.">
+            <app-misson-item [task]="m"></app-misson-item>
+          </ng-container>
+        </nz-collapse-panel> -->
+    <!-- </ng-container> -->
+    <!-- </nz-collapse> -->
+  </div>
+</div>

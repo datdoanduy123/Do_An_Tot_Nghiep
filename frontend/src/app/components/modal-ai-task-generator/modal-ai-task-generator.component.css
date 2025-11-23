@@ -1,0 +1,180 @@
+.ai-task-generator {
+  min-height: 300px;
+}
+
+.upload-section {
+  text-align: center;
+  padding: 20px 0;
+}
+
+.upload-description h4 {
+  color: #1890ff;
+  margin-bottom: 8px;
+}
+
+.upload-description p {
+  color: #666;
+  margin-bottom: 20px;
+}
+
+.upload-area {
+  margin: 20px 0;
+}
+
+.selected-file {
+  margin-top: 16px;
+  padding: 12px;
+  background: #f5f5f5;
+  border-radius: 8px;
+}
+
+.file-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.processing-section {
+  text-align: center;
+  padding: 40px 20px;
+}
+
+.processing-content h4 {
+  color: #1890ff;
+  margin: 16px 0 8px 0;
+}
+
+.processing-steps {
+  display: flex;
+  justify-content: center;
+  gap: 24px;
+  margin-top: 24px;
+}
+
+.step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  opacity: 0.5;
+  transition: opacity 0.3s;
+}
+
+.step.active {
+  opacity: 1;
+  color: #1890ff;
+}
+
+.suggestion-section {
+  max-height: 500px;
+  overflow-y: auto;
+}
+
+.suggestion-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.suggestion-header h4 {
+  color: #1890ff;
+  margin: 0;
+}
+
+.main-task-preview {
+  margin-bottom: 20px;
+}
+
+.main-task-preview h5 {
+  color: #262626;
+  margin-bottom: 12px;
+}
+
+.task-card {
+  padding: 16px;
+  background: #f9f9f9;
+  border-radius: 8px;
+  border-left: 4px solid #1890ff;
+}
+
+.task-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #262626;
+  margin-bottom: 8px;
+}
+
+.task-meta {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 12px;
+  font-size: 12px;
+  color: #666;
+}
+
+.task-description p {
+  color: #666;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.subtasks-preview h5 {
+  color: #262626;
+  margin-bottom: 12px;
+}
+
+.subtasks-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.subtask-item {
+  display: flex;
+  gap: 12px;
+  padding: 12px;
+  background: #fafafa;
+  border-radius: 6px;
+}
+
+.subtask-number {
+  width: 24px;
+  height: 24px;
+  background: #1890ff;
+  color: white;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.subtask-content {
+  flex: 1;
+}
+
+.subtask-title {
+  font-weight: 600;
+  color: #262626;
+  margin-bottom: 4px;
+  font-size: 14px;
+}
+
+.subtask-description {
+  color: #666;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.more-subtasks {
+  text-align: center;
+  padding: 8px;
+  color: #8c8c8c;
+  font-style: italic;
+  font-size: 12px;
+}

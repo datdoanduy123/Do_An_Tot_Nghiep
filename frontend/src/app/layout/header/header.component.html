@@ -1,0 +1,56 @@
+<header class="header" >
+  <!-- Mobile hamburger menu -->
+  <div class="mobile-menu-toggle" *ngIf="isMobile" (click)="toggleSidebar()">
+    <i class="fa-solid fa-bars"></i>
+  </div>
+  <!-- <img src="/assets/img/loo.png" /> -->
+  <div [routerLink]="['/viecduocgiao']" class="logo">DOC TASK</div>
+  
+  <!-- Đưa nút về sát phải, cùng hàng với notification/user -->
+  <div class="header-actions" *ngIf="!isMobile" style="display: flex; align-items: center; margin-left: auto;">
+    <button
+      [ngClass]="{ active: isAssignWorkPage }"
+      [routerLink]="['/assignWork']"
+    >
+      <span class="button_top"> Giao việc</span>
+    </button>
+
+    <button (click)="showInfo()">
+      <span class="button_top"> Tổng hợp </span>
+    </button>
+    </div>
+
+    <div class="user-info" style="margin-left: 20px; position: relative">
+      <app-notification></app-notification>
+      <a nz-dropdown nzTrigger="click" [nzDropdownMenu]="menu" class="m-l-10">
+        <span class="user-avatar">
+          <i class="fa fa-user-circle"></i>
+        </span>
+      </a>
+      <nz-dropdown-menu #menu="nzDropdownMenu">
+        <ul nz-menu class="submenuAuth">
+          <li class="header-popup">
+            <div class="user">
+              <img
+                src="https://api.dicebear.com/7.x/personas/svg?seed=trinhdongzza"
+                alt=""
+              />
+              <div class="desp">
+                <div class="title-primary">{{ username }}</div>
+                <div class="title">{{ email }}</div>
+              </div>
+            </div>
+          </li>
+          <li nz-menu-item (click)="openChangePassword()">
+            <i class="fa-solid fa-lock icon"></i>
+            <p class="SubmenuTooltip title-list">Đổi mật khẩu</p>
+          </li>
+          <li nz-menu-item (click)="logout()">
+            <i class="fa-solid fa-arrow-right-from-bracket icon"></i>
+            <p class="SubmenuTooltip title-list">Đăng xuất</p>
+          </li>
+        </ul>
+      </nz-dropdown-menu>
+    </div>
+  
+</header>

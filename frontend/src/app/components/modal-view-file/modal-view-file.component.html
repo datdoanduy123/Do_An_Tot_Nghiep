@@ -1,0 +1,21 @@
+<nz-modal
+  [(nzVisible)]="isVisible"
+  nzTitle="Xem file "
+  (nzOnCancel)="handleCancel()"
+  [nzWidth]="'50vw'"
+  [nzCentered]="true"
+  [nzBodyStyle]="{ 'overflow': 'hidden', 'padding': '0' }"
+  [nzFooter]="null"
+>
+  <div *nzModalContent>
+    <iframe
+      *ngIf="safeFileUrl"
+      [src]="safeFileUrl"
+      style="width:100%; height:80vh;"
+      frameborder="0"
+    ></iframe>
+    <div *ngIf="!safeFileUrl" style="padding:16px">
+      Không thể xem trước tệp này.
+    </div>
+  </div>
+</nz-modal>

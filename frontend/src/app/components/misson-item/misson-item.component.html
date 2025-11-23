@@ -1,0 +1,83 @@
+<div class="misson-card" [ngClass]="task.id.toString()">
+  <div class="content">
+    <div class="task-title">{{ task.title }}</div>
+    <div class="description">
+      <button class="container-button-datetime desp-button">
+        📅
+        <ng-container *ngIf="task.startDate && task.endDate; else dueDate">
+          {{ convertDateTimeVn(task.startDate) }}
+          -
+          {{ convertDateTimeVn(task.endDate) }}
+        </ng-container>
+        <ng-template #dueDate>Lỗi thời hạn</ng-template>
+      </button>
+      <div class="container-button-assignUser">
+        <div
+          class="desp-button"
+          nz-popover
+          nzPopoverTitle="Tên người thực hiện"
+          nzPopoverTrigger="click"
+          [nzPopoverContent]="contentTemplate"
+        >
+          👤 Người thực hiện
+        </div>
+        <ng-template #contentTemplate>
+          <ul nz-menu>
+            <li nz-menu-item *ngFor="let item of task.assigneeFullNames">
+              <img
+                style="width: 25px; height: 25px; border-radius: 50%"
+                src="https://api.dicebear.com/7.x/personas/svg?seed=trinhdongzza"
+                alt=""
+              />
+              {{ item }}
+            </li>
+            <li
+              nz-menu-item
+              *ngIf="
+                task.assigneeFullNames == null ||
+                task.assigneeFullNames?.length == 0
+              "
+            >
+              Danh sách trống
+            </li>
+          </ul>
+        </ng-template>
+      </div>
+      <div class="container-button-assignFrequency">
+        <a nz-dropdown nzTrigger="click" [nzDropdownMenu]="menu">
+          <div class="center-flex">
+            <ng-container
+              *ngIf="
+                task.frequencyType != null || task.frequencyType != '';
+                else defaultTag
+              "
+            >
+              <div class="desp-button">
+                📆 Lịch báo cáo theo {{ frequencyView.frequency_type }}
+              </div>
+            </ng-container>
+            <ng-template #defaultTag>
+              <div class="sub-title">Lỗi hiển thị lịch báo cáo</div>
+            </ng-template>
+          </div>
+        </a>
+        <nz-dropdown-menu #menu="nzDropdownMenu" #menuRef="nzDropdownMenu">
+          <div class="assign-dropdown" nz-menu>
+            <app-select-repeat-schedule
+              [isEdit]="false"
+              [initValue]="frequencyView"
+            ></app-select-repeat-schedule>
+          </div>
+        </nz-dropdown-menu>
+      </div>
+      <div class="container-button-content">
+        <div (click)="showModalDesp()" class="desp-button">
+          <span> 🔍 Nội dung </span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<app-modal-detail-despcription-job
+  [desp]="task.description"
+></app-modal-detail-despcription-job>

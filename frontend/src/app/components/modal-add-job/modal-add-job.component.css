@@ -1,0 +1,191 @@
+::ng-deep .ant-modal {
+  width: 900px !important; /* Tăng từ 650px lên 900px */
+  max-width: 95vw !important; /* Responsive cho mobile */
+}
+
+::ng-deep .ant-picker-footer {
+  display: none !important;
+}
+
+::ng-deep .ant-modal-body {
+  padding: 20px 24px !important; /* Tăng padding */
+  min-height: 400px; /* Đảm bảo chiều cao tối thiểu */
+}
+
+::ng-deep .ant-modal-title {
+  font-size: 20px !important;
+  font-weight: 600 !important;
+}
+
+.title-despJob {
+  width: 155px;
+  font-weight: 500;
+  color: #333;
+}
+
+/* Style cho form layout giống thêm việc con */
+.form-container {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.form-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.form-label {
+  min-width: 155px;
+  font-weight: 500;
+  color: #333;
+  text-align: left;
+}
+
+.form-input {
+  flex: 1;
+}
+
+/* Quill Editor styling */
+::ng-deep .ql-editor {
+  min-height: 200px !important; /* Tăng chiều cao editor */
+  max-height: 300px;
+  overflow-y: auto;
+  font-family: 'Poppins', sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+::ng-deep .ql-toolbar {
+  border-top: 1px solid #d9d9d9;
+  border-left: 1px solid #d9d9d9;
+  border-right: 1px solid #d9d9d9;
+  border-radius: 6px 6px 0 0;
+  background: #fafafa;
+}
+
+::ng-deep .ql-container {
+  border-bottom: 1px solid #d9d9d9;
+  border-left: 1px solid #d9d9d9;
+  border-right: 1px solid #d9d9d9;
+  border-radius: 0 0 6px 6px;
+  font-size: 14px;
+}
+
+::ng-deep .ql-snow .ql-tooltip {
+  z-index: 1060;
+}
+
+/* Input styling */
+::ng-deep .ant-input,
+::ng-deep .ant-picker,
+::ng-deep .ant-select-selector {
+  padding: 8px 12px !important;
+  font-size: 14px !important;
+  border-radius: 6px !important;
+}
+
+::ng-deep .ant-picker {
+  width: 100% !important;
+}
+
+/* Button styling */
+::ng-deep .ant-modal-footer {
+  padding: 16px 24px !important;
+  text-align: right;
+}
+
+::ng-deep .ant-btn {
+  height: 36px !important;
+  padding: 0 20px !important;
+  font-size: 14px !important;
+  border-radius: 6px !important;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  ::ng-deep .ant-modal {
+    width: 95vw !important;
+    margin: 10px;
+  }
+  
+  ::ng-deep .ant-modal-body {
+    padding: 16px !important;
+  }
+  
+  .form-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  
+  .form-label {
+    min-width: auto;
+    width: 100%;
+  }
+  
+  .form-input {
+    width: 100%;
+  }
+  
+  ::ng-deep .ql-editor {
+    min-height: 150px !important;
+  }
+}
+
+@media (max-width: 480px) {
+  ::ng-deep .ant-modal {
+    width: 100vw !important;
+    margin: 0;
+    top: 0 !important;
+    height: 100vh;
+  }
+  
+  ::ng-deep .ant-modal-content {
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+  
+  ::ng-deep .ant-modal-body {
+    flex: 1;
+    overflow-y: auto;
+  }
+}
+ .edit-title {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .edit-title .title {
+    width: 100%;
+    min-width: unset;
+    margin-bottom: 6px;
+  }
+
+  .edit-title > *:not(.title) {
+    width: 100%;
+    max-width: 100%;
+  }
+.edit-title .container-button-assignUser {
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+  .label-text {
+  width: 160px; 
+  white-space: normal;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  flex-shrink: 0;
+  line-height: 1.4;
+}
+.row-line {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.row-line nz-switch {
+  flex-shrink: 0;
+}
+

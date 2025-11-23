@@ -1,0 +1,181 @@
+<!-- src/app/pages/ai-agent-page/ai-agent-page.component.html -->
+<div class="ai-agent-container">
+  <!-- Header -->
+  <div class="ai-agent-header">
+    <div class="header-left">
+      
+      <div class="page-info">
+        <h2>AI Agent - Đề xuất công việc</h2>
+      </div>
+    </div>
+    <div class="header-actions">
+      <button 
+        nz-button 
+        nzType="default" 
+        (click)="regenerateSuggestions()"
+        [nzLoading]="isGenerating"
+        [disabled]="isGenerating">
+        <i nz-icon nzType="reload"></i>
+        Tạo lại đề xuất
+      </button>
+    </div>
+  </div>
+
+  <nz-divider></nz-divider>
+
+  <!-- Loading State -->
+  <div *ngIf="isGenerating" class="loading-container">
+    <nz-spin nzSize="large">
+      <div class="loading-content">
+        <h3>AI đang phân tích và tạo đề xuất...</h3>
+        <p>Vui lòng đợi trong giây lát</p>
+      </div>
+    </nz-spin>
+  </div>
+
+  <!-- AI Suggestion Content -->
+  <div *ngIf="!isGenerating && aiSuggestion" class="suggestion-content">
+    <!-- Main Task Card -->
+    <nz-card 
+      class="main-task-card" 
+      nzTitle="📋 Công việc chính"
+      [nzExtra]="mainTaskActions">
+      
+      <ng-template #mainTaskActions>
+        <div class="main-task-extra">
+          <p class="file-info">
+            <i nz-icon nzType="file-text"></i>
+            Từ file: <strong>{{ fileName }}</strong>
+          </p>
+          <button 
+            nz-button 
+            nzType="primary" 
+            nzSize="small"
+            (click)="copyContent(aiSuggestion!.title + '\n\n' + aiSuggestion!.description)">
+            <i nz-icon nzType="copy"></i>
+            Copy
+          </button>
+        </div>
+      </ng-template>
+
+      <div class="task-info">
+        <h3 class="task-title">{{ aiSuggestion.title }}</h3>
+        <div class="task-meta">
+          <nz-tag nzColor="blue">
+            <i nz-icon nzType="calendar"></i>
+            {{ formatDate(aiSuggestion.startDate) }} - {{ formatDate(aiSuggestion.endDate) }}
+          </nz-tag>
+          <nz-tag nzColor="green">
+            <i nz-icon nzType="clock-circle"></i>
+            {{ calculateDuration(aiSuggestion.startDate, aiSuggestion.endDate) }} ngày
+          </nz-tag>
+          <nz-tag nzColor="orange">
+            <i nz-icon nzType="branches"></i>
+            {{ aiSuggestion.subtasks.length }} công việc con
+          </nz-tag>
+        </div>
+        <div class="task-description">
+          <h4>Mô tả:</h4>
+          <p>{{ aiSuggestion.description }}</p>
+        </div>
+      </div>
+
+       <!-- Subtasks Toggle Button -->
+    <div class="subtasks-toggle-section">
+      <button 
+        nz-button 
+        nzType="default" 
+        nzSize="large"
+        class="toggle-subtasks-btn"
+        (click)="toggleSubtasks()">
+        <i nz-icon 
+           [nzType]="isSubtasksVisible ? 'up' : 'down'"
+           class="toggle-icon"></i>
+        <span class="toggle-text">
+          {{ isSubtasksVisible ? 'Ẩn' : 'Xem' }} công việc con 
+          ({{ aiSuggestion.subtasks.length }})
+        </span>
+      </button>
+    </div>
+
+    <!-- Subtasks Section - Có thể ẩn/hiện -->
+    <div class="subtasks-section" 
+         [class.visible]="isSubtasksVisible"
+         [class.hidden]="!isSubtasksVisible">
+      
+      <!-- Subtasks Header -->
+      <div class="subtasks-header" *ngIf="isSubtasksVisible">
+        <h3>📝 Các công việc con được đề xuất</h3>
+        <div class="subtasks-summary">
+          <span class="summary-text">
+            Tổng cộng {{ aiSuggestion.subtasks.length }} công việc con
+          </span>
+        
+        </div>
+      </div>
+
+      <!-- Subtasks List -->
+      <div class="subtasks-list" *ngIf="isSubtasksVisible">
+        <nz-card 
+          *ngFor="let subtask of aiSuggestion.subtasks; let i = index"
+          class="subtask-card"
+          [nzTitle]="'Công việc con ' + (i + 1)"
+          [nzExtra]="subtaskActions">
+          
+          <ng-template #subtaskActions>
+            <button 
+              nz-button 
+              nzType="text" 
+              nzSize="small"
+              (click)="copyContent(subtask.title + '\n\n' + subtask.description)">
+              <i nz-icon nzType="copy"></i>
+              Copy
+            </button>
+          </ng-template>
+
+          <div class="subtask-info">
+            <h4 class="subtask-title">{{ subtask.title }}</h4>
+            <div class="subtask-meta">
+              <nz-tag nzColor="cyan" nzSize="small">
+                <i nz-icon nzType="calendar"></i>
+                {{ formatDate(subtask.startDate) }} - {{ formatDate(subtask.dueDate) }}
+              </nz-tag>
+            </div>
+            <div class="subtask-description">
+              <h5>Mô tả:</h5>
+              <p style="white-space: pre-line;">{{ subtask.description }}</p>
+            </div>
+          </div>
+        </nz-card>
+          <button 
+            nz-button
+            nzType="text" 
+            nzSize="small"
+            (click)="toggleSubtasks()"
+            class="collapse-btn">
+            <i nz-icon nzType="up"></i>
+            Thu gọn
+          </button>
+      </div>
+    </div>
+    </nz-card>
+
+   
+  </div>
+
+  <!-- Empty State -->
+  <div *ngIf="!isGenerating && !aiSuggestion" class="empty-state">
+    <div class="empty-content">
+      <i nz-icon nzType="robot" class="empty-icon"></i>
+      <h3>Chưa có đề xuất nào</h3>
+      <p>Click "Tạo lại đề xuất" để AI tạo đề xuất công việc từ file của bạn</p>
+      <button 
+        nz-button 
+        nzType="primary" 
+        (click)="generateTaskSuggestions()">
+        <i nz-icon nzType="thunderbolt"></i>
+        Tạo đề xuất
+      </button>
+    </div>
+  </div>
+</div>

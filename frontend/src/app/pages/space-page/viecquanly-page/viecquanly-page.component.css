@@ -1,0 +1,52 @@
+.container-viecquanly {
+  margin: 15px 5px 15px 20px;
+  height: calc(
+    100vh - 100px
+  ); /* Chiều cao bằng viewport height trừ đi margin và padding */
+  overflow-y: scroll;
+}
+
+.body {
+  position: relative;
+  height: 95%;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  z-index: 1000;
+  margin-right: 20px;
+}
+.search {
+  flex: 2;
+}
+.ant-pagination {
+  display: flex;
+  justify-content: center;
+}
+.title {
+  display: flex;
+  align-items: center;
+  flex: 5;
+}
+
+.title-text {
+  font-weight: 600;
+  margin-left: 12px;
+  font-size: 19px;
+}
+
+.center-flex1 {
+  position: fixed;       /* luôn nằm giữa dù scroll */
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%); /* căn giữa tuyệt đối */
+  z-index: 9999;         /* nổi lên trên cùng */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+}

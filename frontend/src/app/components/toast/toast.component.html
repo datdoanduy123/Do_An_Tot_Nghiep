@@ -1,0 +1,35 @@
+<div class="toast-custom">
+  @for(toast of toasts; track toast){
+  <div class="toast-content" [ngClass]="toast.type">
+    <i
+      *ngIf="toast.type == 'danger'"
+      class="fa-solid fa-circle-xmark icon-x"
+    ></i>
+    <i
+      *ngIf="toast.type == 'info'"
+      class="fa-solid fa-circle-info icon-info"
+    ></i>
+    <i
+      *ngIf="toast.type == 'warning'"
+      class="fa-solid fa-triangle-exclamation icon-warning"
+    ></i>
+    <i
+      *ngIf="toast.type == 'success'"
+      class="fa-solid fa-circle-check icon-success"
+    ></i>
+
+    <div class="message">
+      <span class="text text-1" [ngClass]="toast.type">{{ toast.title }}</span>
+      <span class="text text-2" [ngClass]="toast.type">{{
+        toast.message
+      }}</span>
+    </div>
+    <i (click)="removeToast(toast.id)" class="fa-solid fa-x icon-close"></i>
+  </div>
+  <div class="progress active success" *ngIf="toast.type == 'success'"></div>
+  <div class="progress active info" *ngIf="toast.type == 'info'"></div>
+  <div class="progress active warning" *ngIf="toast.type == 'warning'"></div>
+  <div class="progress active danger" *ngIf="toast.type == 'danger'"></div>
+
+  }
+</div>

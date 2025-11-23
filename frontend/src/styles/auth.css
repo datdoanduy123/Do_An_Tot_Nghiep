@@ -1,0 +1,131 @@
+.auth-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  background-color: #f5f5f5;
+  background-image: url("/assets/img/background-login.png");
+  background-size: cover;
+}
+.auth-box {
+  width: 380px;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08);
+  padding: 28px;
+}
+.form-group {
+  margin-bottom: 12px;
+  gap:0.5rem
+}
+.text-error {
+  color: #ef4444;
+  font-size: 13px;
+}
+.auth-button {
+  width: 100%;
+  background-color: var(--background-primary);
+  color: white;
+  padding: 0.75rem;
+  border: none;
+  border-radius: 4px;
+  font-size: 1rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+  margin-top: 1rem;
+}
+.auth-button:hover {
+  background-color: #d32f2f;
+}
+.forgot-password {
+  text-align: center;
+  margin-top: 12px;
+}
+
+.forgot-password a {
+  color: #2563eb;
+  text-decoration: none;
+  font-size: 0.9rem;
+}
+
+.forgot-password a:hover {
+  text-decoration: underline;
+}
+.form-group input {
+  /* padding: 0.75rem; */
+  border-radius: 4px;
+  font-size: 1rem;
+  transition: border-color 0.3s ease;
+}
+
+
+.form-group label {
+  font-weight: 500;
+  color: #555;
+}
+@media (max-width: 420px) {
+  .auth-box {
+    width: 90%;
+    padding: 20px;
+  }
+}
+.auth-header {
+  text-align: center;
+  margin-bottom: 1.5rem;
+}
+.auth-input {
+  width: 100%;
+  padding: 10px 40px 10px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 14px;
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  background-color: #fff;
+  box-sizing: border-box;
+}
+
+/* focus effect */
+.auth-input:focus {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+.input-wrapper {
+  position: relative;
+}
+
+.toggle-password {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-size: 18px;
+  line-height: 1;
+  padding: 0;
+}
+
+.toggle-password:hover {
+  opacity: 0.8;
+}
+.auth-box {
+  width: 380px;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08);
+  padding: 28px;
+}
+.auth-button:hover {
+  background-color: #d32f2f;
+}
+.auth-header h2, h4 {
+  color: #333;
+  margin-bottom: 0.5rem;
+  font-family: "PoppInins", sans-serif;
+}
+.auth-header h2{
+    font-weight: 600;
+}

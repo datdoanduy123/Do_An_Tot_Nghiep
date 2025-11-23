@@ -1,0 +1,222 @@
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: var(--background-primary);
+  color: #fff;
+  padding: 0 32px;
+  height: 68px;
+  font-size: 24px;
+  background-image: url("/assets/img/background-login.png");
+  background-size: cover;
+}
+
+/* From Uiverse.io by Voxybuns */
+button {
+  --button_radius: 0.75em;
+  --button_color: #e8e8e8;
+  /* --button_outline_color: var(--background-primary2); */
+  font-size: 17px;
+  font-weight: bold;
+  border: none;
+  cursor: pointer;
+  border-radius: var(--button_radius);
+  background: var(--button_outline_color);
+}
+
+.button_top {
+  display: block;
+  box-sizing: border-box;
+  border: 2px solid var(--button_outline_color);
+  border-radius: var(--button_radius);
+  /* padding: 0.65em 1.2em; */
+  padding: 5px 10px;
+  background: #ffdb58;
+  font-size: 16px;
+  color: #f44336;
+  font-weight: 600;
+  transform: translateY(-0.2em);
+  transition: transform 0.1s ease;
+}
+
+
+
+button:hover .button_top {
+  /* Pull the button upwards when hovered */
+  transform: translateY(-0.33em);
+}
+
+button:active .button_top {
+  /* Push the button downwards when pressed */
+  transform: translateY(0);
+}
+
+.logo {
+  font-weight: bold;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  margin-left: auto;
+}
+.header-actions button {
+  margin-right: 10px;
+}
+.user-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 18px;
+}
+
+.user-avatar {
+  font-size: 32px;
+}
+
+.submenuAuth {
+  top: 10px;
+  right: 0;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  min-width: 200px;
+  z-index: 99;
+  margin: 0 !important;
+  padding: 9px 7px !important;
+  display: flex;
+  color: #222;
+  list-style: none;
+  flex-direction: column;
+}
+.submenuAuth .header-popup {
+  display: flex;
+  justify-content: start;
+  align-items: center;
+  background-color: white;
+  color: black;
+  font-size: 16px;
+  padding: 0 5px 5px 5px;
+  height: 100%;
+  border-bottom: #ccc 1px solid;
+  margin-bottom: 5px;
+}
+.submenuAuth .header-popup img {
+  width: 35px;
+  height: 35px;
+  border-radius: 50%;
+}
+.submenuAuth .header-popup .desp {
+  font-size: 14px;
+  color: #797979;
+}
+.title-primary {
+  color: black;
+}
+
+.submenuAuth li {
+  color: black;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  /* justify-content: space-between; */
+  padding: 5px 5px;
+  cursor: pointer;
+  border-radius: 8px;
+  transition: background 0.2s;
+}
+
+.submenuAuth .icon {
+  margin: 0;
+  font-size: 18px;
+  border-radius: 8px;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.submenuAuth .title-list {
+  margin: 0;
+  padding: 0;
+  font-size: 16px;
+  font-weight: 400;
+  line-height: 1;
+}
+.m-l-10 {
+  margin-left: 10px;
+}
+/* ----- */
+a {
+  color: white;
+}
+::ng-deep .ant-menu-title-content {
+  display: flex;
+  /* flex-direction: row; */
+  align-items: center;
+  transition: color 0.3s;
+}
+
+
+/* Mobile hamburger menu */
+.mobile-menu-toggle {
+  display: none;
+  cursor: pointer;
+  font-size: 24px;
+  color: #fff;
+  z-index: 1002;
+}
+
+.desktop-buttons {
+  display: flex;
+  align-items: center;
+}
+
+.user-info {
+  display: flex;
+  align-items: center;
+}
+
+/* Mobile responsive */
+@media (max-width: 768px) {
+  .header {
+      width: 100vw;
+    min-width: 0;
+    max-width: 100vw;
+    padding: 0 16px;
+    justify-content: space-between;
+    height: 48px;
+    box-sizing: border-box;
+    margin: 0;
+  }
+  
+  .mobile-menu-toggle {
+    display: block;
+  }
+  
+  .desktop-buttons {
+    display: none !important;
+  }
+  
+  .logo {
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 20px;
+  }
+  
+  .user-info {
+    margin-left: 0 !important;
+  }
+  .sidebar-overlay[_ngcontent-ng-c3729103687] {
+    display: none;
+    position: fixed;
+    top: 68px;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(255, 255, 255, 0.5);
+    z-index: 999;
+}
+}

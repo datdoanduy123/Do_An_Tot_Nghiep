@@ -1,0 +1,160 @@
+.container-viecdagiao {
+  margin: 15px 15px 15px 20px;
+  height: calc(
+    100vh - 100px
+  ); 
+  overflow-y: scroll;
+  overflow-x: hidden;
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE 10+ */
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-right: 20px;
+}
+
+.search {
+  flex: 2;
+}
+
+.body {
+  height: 95%;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.ant-pagination {
+  display: flex;
+  justify-content: center;
+}
+
+.title {
+  display: flex;
+  align-items: center;
+  flex: 5;
+}
+
+.title-text {
+  font-weight: 600;
+  margin-left: 12px;
+  font-size: 19px;
+}
+
+.highlight {
+  background-color: #ffff99; /* Màu vàng nhạt */
+  transition: background-color 0.5s;
+}
+
+/* Mobile responsive styles */
+@media (max-width: 768px) {
+  .container-viecdagiao {
+    margin: 8px;
+    height: calc(100vh - 48px - 70px - 16px); /* header height - bottom nav height - margin */
+    padding: 0;
+  }
+
+  .header {
+    flex-direction: column;
+    gap: 12px;
+    margin-right: 0;
+    margin-bottom: 16px;
+  }
+
+  .title {
+    flex: none;
+    width: 100%;
+    justify-content: center;
+  }
+
+  .title-text {
+    font-size: 16px;
+    margin-left: 8px;
+    text-align: center;
+  }
+
+  .search {
+    flex: none;
+    width: 100%;
+  }
+
+  .body {
+    height: calc(100% - 80px); /* Giảm height để tránh bị che bởi header mobile */
+  }
+
+  /* Pagination responsive */
+  .ant-pagination {
+    padding: 8px 0;
+    margin-top: 16px;
+  }
+
+  /* Task cards responsive - nếu có */
+  .task-card {
+    margin: 8px 0;
+    padding: 12px;
+  }
+
+  /* Search input responsive */
+  ::ng-deep .ant-input {
+    font-size: 16px; /* Prevent zoom on iOS */
+  }
+
+  ::ng-deep .ant-select {
+    font-size: 16px;
+  }
+}
+
+/* Very small screens */
+@media (max-width: 480px) {
+  .container-viecdagiao {
+    margin: 4px;
+    height: calc(100vh - 48px - 70px - 8px);
+  }
+
+  .title-text {
+    font-size: 14px;
+  }
+
+  .header {
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+
+  /* Hide pagination text on very small screens */
+  ::ng-deep .ant-pagination-item {
+    min-width: 28px;
+    height: 28px;
+    line-height: 26px;
+  }
+
+  ::ng-deep .ant-pagination-prev,
+  ::ng-deep .ant-pagination-next {
+    min-width: 28px;
+    height: 28px;
+    line-height: 26px;
+  }
+}
+
+/* Landscape orientation adjustments */
+@media (max-width: 768px) and (orientation: landscape) {
+  .container-viecdagiao {
+    height: calc(100vh - 48px - 70px - 8px);
+  }
+
+  .header {
+    flex-direction: row;
+    gap: 16px;
+  }
+
+  .title {
+    flex: 1;
+    justify-content: flex-start;
+  }
+
+  .search {
+    flex: 2;
+  }
+}

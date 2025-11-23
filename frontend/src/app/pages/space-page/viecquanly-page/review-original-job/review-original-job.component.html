@@ -1,0 +1,223 @@
+<div class="modal">
+  <div class="modal-header">
+    <div class="button-back" (click)="goBack()">
+      <i class="fa-solid fa-arrow-left"></i>
+    </div>
+    <div class="title">Rà soát công việc</div>
+  </div>
+
+  <div class="modal-body">
+    <div class="select-container">
+      <div class="flex-space-between-align-item-start">
+        <div>
+          <app-select-multi-unit
+            (selectedUnit)="listSelectedUnit = $event"
+          ></app-select-multi-unit>
+        </div>
+        <div class="select-schedule">
+          <!-- <div class="flex m-b-10">
+            <div>Theo kỳ thời gian</div>
+            <nz-switch
+              class="m-l-10"
+              nzSize="small"
+              [(ngModel)]="isReviewSchedule"
+            ></nz-switch>
+          </div> -->
+          <!-- <div *ngIf="isReviewSchedule">Kỳ tháng</div> -->
+          <!-- <div *ngIf="isReviewSchedule" class="repeat-schedule">
+            <div class="m-r-5">Tần suất</div>
+            <input
+              type="number"
+              class="m-r-5"
+              [(ngModel)]="repeatschedule"
+              [min]="1"
+            />
+            <div>tháng</div>
+          </div> -->
+        </div>
+        <div class="btn" (click)="review()">Rà soát</div>
+      </div>
+      <div class="space-10px"></div>
+      <div class="more-options">
+        <div></div>
+        <div class="flex">
+          <div class="btn" (click)="showModalSendRemind()">🔔 Nhắc nhở</div>
+          <div
+            class="btn"
+            (click)="beforeConfirm()"
+            nz-popconfirm
+            nzPopconfirmTitle="Bạn chắc chắn chứ ?"
+            [nzBeforeConfirm]="beforeConfirm"
+            (nzOnConfirm)="confirm()"
+            (nzOnCancel)="cancel()"
+          >
+            Tổng hợp báo
+          </div>
+        </div>
+      </div>
+      <div class="space-10px"></div>
+    </div>
+
+    <ng-container *ngIf="isShowDataDefault">
+      <nz-table
+        #fixedTable
+        [nzData]="listDataDefault"
+        [nzShowPagination]="true"
+        [nzScroll]="{ y: '600px', x: 'max-content' }"
+        [nzLoading]="isloadingTable"
+      >
+        <thead>
+          <tr>
+            <th
+              nzLeft
+              nzWidth="40px"
+              [(nzChecked)]="checked"
+              [nzIndeterminate]="indeterminate"
+              (nzCheckedChange)="onAllChecked($event)"
+            ></th>
+            <th nzLeft nzWidth="200px">Đơn vị</th>
+            <!-- <th nzWidth="150px">Kỳ</th> -->
+            <th nzWidth="150px">Trạng thái</th>
+
+            <th nzWidth="300px">Kết quả</th>
+            <th nzWidth="300px">Kiến nghị/ Đề xuất</th>
+            <th nzWidth="300px">Phản hồi</th>
+            <th nzWidth="200px">File đính kèm</th>
+          </tr>
+        </thead>
+
+        <tbody>
+          <ng-container *ngFor="let group of fixedTable.data">
+            <!-- Dòng nhóm frequency -->
+            <tr class="group-row">
+              <td
+                nzLeft
+                [nzChecked]="setOfCheckedId.has(group.userId)"
+                (nzCheckedChange)="onItemChecked(group.userId, $event)"
+              ></td>
+              <td nzLeft>
+                <strong>{{ group.userName }}</strong>
+              </td>
+            </tr>
+
+            <!-- Dòng chi tiết từng item trong nhóm -->
+            <ng-container *ngFor="let item of group.progresses">
+              <tr>
+                <td nzLeft></td>
+                <td nzLeft></td>
+                <!-- Cột Kỳ để trống cho dòng chi tiết -->
+                <td>Kỳ {{ item.periodIndex }} ({{ item.scheduledDate }})</td>
+                <td>{{ item.status }}</td>
+
+                <td>{{ item.result }}</td>
+                <td>{{ item.suggest }}</td>
+                <td>{{ item.feedback }}</td>
+                <td>
+                  <div
+                    nz-popover
+                    nzType="primary"
+                    [nzPopoverContent]="ViewFile"
+                  >
+                    {{ item.file }}
+                  </div>
+                </td>
+                <ng-template #ViewFile>
+                  <div class="flex action-file">
+                    <i
+                      class="fa-regular fa-eye"
+                      (click)="showModalFile('item.file')"
+                    >
+                    </i>
+                    <i class="fa-solid fa-download m-l-10"></i>
+                  </div>
+                </ng-template>
+              </tr>
+            </ng-container>
+          </ng-container>
+        </tbody>
+      </nz-table>
+    </ng-container>
+    <ng-container *ngIf="isShowDataByUnit">
+      <nz-table
+        #fixedTable
+        [nzData]="listDataByUnit"
+        [nzShowPagination]="true"
+        [nzScroll]="{ y: '600px', x: 'max-content' }"
+        [nzLoading]="isloadingTable"
+      >
+        <thead>
+          <tr>
+            <th
+              nzLeft
+              nzWidth="40px"
+              [(nzChecked)]="checked"
+              [nzIndeterminate]="indeterminate"
+              (nzCheckedChange)="onAllChecked($event)"
+            ></th>
+            <th nzLeft nzWidth="200px">Đơn vị</th>
+            <th nzWidth="150px">Kỳ</th>
+            <th nzWidth="150px">Trạng thái</th>
+
+            <th nzWidth="300px">Kết quả</th>
+            <th nzWidth="300px">Kiến nghị/ Đề xuất</th>
+            <th nzWidth="300px">Phản hồi</th>
+            <th nzWidth="200px">File đính kèm</th>
+          </tr>
+        </thead>
+
+        <tbody>
+          <ng-container *ngFor="let group of fixedTable.data">
+            <!-- Dòng nhóm frequency -->
+            <tr class="group-row">
+              <td
+                nzLeft
+                [nzChecked]="setOfCheckedId.has(group.unitId)"
+                (nzCheckedChange)="onItemChecked(group.unitId, $event)"
+              ></td>
+              <td nzLeft>
+                <strong>{{ group.unitName }}</strong>
+              </td>
+            </tr>
+
+            <!-- Dòng chi tiết từng item trong nhóm -->
+            <ng-container *ngFor="let item of group.progresses">
+              <tr>
+                <td nzLeft></td>
+                <td nzLeft></td>
+                <!-- Cột Kỳ để trống cho dòng chi tiết -->
+                <td>Kỳ {{ item.periodIndex }}</td>
+                <td>{{ item.status }}</td>
+
+                <td>{{ item.result }}</td>
+                <td>{{ item.suggest }}</td>
+                <td>{{ item.feedback }}</td>
+                <td>
+                  <div
+                    nz-popover
+                    nzType="primary"
+                    [nzPopoverContent]="ViewFile"
+                  >
+                    {{ item.file }}
+                  </div>
+                </td>
+                <ng-template #ViewFile>
+                  <div class="flex action-file">
+                    <i
+                      class="fa-regular fa-eye"
+                      (click)="showModalFile('item.file')"
+                    >
+                    </i>
+                    <i class="fa-solid fa-download m-l-10"></i>
+                  </div>
+                </ng-template>
+              </tr>
+            </ng-container>
+          </ng-container>
+        </tbody>
+      </nz-table>
+    </ng-container>
+  </div>
+</div>
+<app-modal-view-file></app-modal-view-file>
+
+<app-modal-send-remind></app-modal-send-remind>

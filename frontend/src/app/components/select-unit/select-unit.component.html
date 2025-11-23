@@ -1,0 +1,37 @@
+<div class="select-unit">
+  <div class="flex">
+    <div class="flex-column-start">
+      <label class="m-b-5 title" for="bo">Chọn đơn vị</label>
+      <nz-select
+        nzShowSearch
+        nzAllowClear
+        nzPlaceHolder="-- Chọn Bộ --"
+        [(ngModel)]="selectedBo"
+        (nzOpenChange)="onBoChange()"
+      >
+        <nz-option
+          *ngFor="let d of departments"
+          [nzLabel]="d.bo"
+          [nzValue]="d.bo"
+        ></nz-option>
+      </nz-select>
+    </div>
+    <!-- Select Phòng ban -->
+    <div class="flex-column-start m-l-10">
+      <label class="m-b-5 title" for="phongban">Chọn Phòng ban</label>
+      <nz-select
+        nzShowSearch
+        nzAllowClear
+        nzPlaceHolder="-- Chọn Phòng ban --"
+        [(ngModel)]="selectedPhongBan"
+        (nzOpenChange)="onUnitChange()"
+      >
+        <nz-option
+          *ngFor="let pb of filteredPhongBans"
+          [nzLabel]="pb"
+          [nzValue]="pb"
+        ></nz-option>
+      </nz-select>
+    </div>
+  </div>
+</div>

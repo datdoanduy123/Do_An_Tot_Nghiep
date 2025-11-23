@@ -1,0 +1,43 @@
+<div class="container-viecquanly">
+  <div class="header">
+    <div class="title">
+      <i routerLink="" class="fa-solid fa-list-check"></i>
+      <div class="title-text">Các công việc quản lý</div>
+    </div>
+    <div class="search">
+      <nz-input-group [nzSuffix]="suffixIconSearch">
+        <input
+          type="text"
+          [(ngModel)]="textSearch"
+          (ngModelChange)="onSearchChange($event)"
+          nz-input
+          placeholder="Tìm kiếm công việc"
+        />
+      </nz-input-group>
+      <ng-template #suffixIconSearch>
+        <nz-icon nzType="search" />
+      </ng-template>
+    </div>
+  </div>
+  <div class="body">
+    <div>
+      <ng-container *ngFor="let item of listViecquanly">
+        <app-viecquanly-item [viecquanly]="item"></app-viecquanly-item>
+      </ng-container>
+    </div>
+  
+    <app-loading class="center-flex1" *ngIf="isLoading"></app-loading>
+
+    <app-page-empty
+      class="center-flex"
+      *ngIf="!isLoading && listViecquanly.length == 0"
+    ></app-page-empty>
+    <nz-pagination
+  [nzPageIndex]="paginationState.currentPage"
+  [nzPageSize]="paginationState.pageSize"
+[nzTotal]="(paginationState.totalPages ?? 0) * (paginationState.pageSize ?? 1)"
+  (nzPageIndexChange)="onPageChange($event)"
+  nzShowSizeChanger="false"
+></nz-pagination>
+  </div>
+</div>

@@ -1,0 +1,45 @@
+<div class="container-viecdagiao">
+  <div class="header">
+    <div class="title">
+      <i routerLink="" class="fa-solid fa-list-check"></i>
+      <div class="title-text">Các công việc được giao</div>
+    </div>
+    <div class="search">
+      <nz-input-group [nzSuffix]="suffixIconSearch">
+        <input
+          type="text"
+          [(ngModel)]="textSearch"
+          (ngModelChange)="onSearchChange($event)"
+          nz-input
+          placeholder="Tìm kiếm công việc"
+        />
+      </nz-input-group>
+      <ng-template #suffixIconSearch>
+        <nz-icon nzType="search" />
+      </ng-template>
+    </div>
+  </div>
+  <div class="body">
+    <div>
+      <ng-container *ngFor="let item of listViecdagiao">
+        <app-viecdagiao-item
+          [attr.id]="'item-' + item.taskId"
+          [ngClass]="{ highlight: item.taskId.toString() == highlightedId }"
+          [viecdagiao]="item"
+          [highlight]="item.taskId.toString() === highlightedId"
+        ></app-viecdagiao-item>
+      </ng-container>
+    </div>
+    <app-loading class="center-flex" *ngIf="isLoading"></app-loading>
+    <app-page-empty
+      class="center-flex"
+      *ngIf="!isLoading && listViecdagiao.length == 0"
+    ></app-page-empty>
+    <nz-pagination
+      [nzPageIndex]="currentPage"
+      [nzPageSize]="pageSize || 10"
+      (nzPageIndexChange)="onPageChange($event)"
+      [nzTotal]="totalPages"
+    ></nz-pagination>
+  </div>
+</div>

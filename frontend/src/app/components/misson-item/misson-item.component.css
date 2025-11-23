@@ -1,0 +1,209 @@
+/* task-item.component.css */
+.misson-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background-color: #fff;
+  padding: 0px 16px;
+  margin: 6px 0;
+  font-family: sans-serif;
+  width: 100%;
+  border-left: 1px solid #ccc;
+}
+
+.misson-card:hover .misson-actions {
+  display: flex;
+}
+.misson-card .check-box {
+  width: 15px;
+  height: 15px;
+  accent-color: #007bff;
+}
+
+.misson-card i {
+  font-size: 22px;
+}
+
+.container.icon-detail {
+  position: relative;
+  width: 25px;
+  height: 25px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 0;
+}
+.icon-detail {
+  color: rgb(131, 129, 129);
+}
+
+.content {
+  display: flex;
+  flex-direction: column;
+  align-items: start;
+  box-shadow: none;
+  padding: 5px 16px;
+  flex-grow: 1;
+}
+
+.task-title {
+  font-size: 16px;
+  font-weight: 500;
+  margin-bottom: 5px;
+}
+
+.description {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 3px;
+}
+.desp-button {
+  padding: 5px 8px;
+  border: 1px solid #ccc;
+  background: white;
+  font-weight: normal;
+  border-radius: 1rem;
+  cursor: pointer;
+  font-size: 12px;
+  color: #5d5d5d;
+  font-weight: 500;
+
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 300px;
+}
+.assign-dropdown {
+  border: 1px solid #e1e4e8;
+  border-radius: 12px;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
+  padding: 12px;
+  /* margin-top: 5px; */
+}
+
+/* .container-button-assign {
+  position: relative;
+} */
+.misson-actions {
+  display: none;
+  align-items: center;
+  gap: 8px;
+}
+.misson-actions i {
+  font-size: 16px;
+  color: #ff2d60;
+}
+.btn-actions {
+  padding: 6px 12px;
+  margin-right: 8px;
+  color: white;
+  border: none;
+  border-radius: 20%;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.btn-actions:hover {
+  background-color: #dddddd;
+}
+.date {
+  font-size: 13px;
+  color: #f44336;
+  font-weight: 500;
+}
+
+.btn-update {
+  padding: 6px 12px;
+  margin-right: 8px;
+  background-color: #56adf5;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.btn-update:hover {
+  background-color: #1976d2;
+}
+
+.more-options {
+  margin-left: 8px;
+  color: #aaa;
+  cursor: pointer;
+}
+
+.submenuMoreOption {
+  position: absolute;
+  top: 20px;
+  left: -15px;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  min-width: 180px;
+  z-index: 99;
+  margin: 0 !important;
+  padding: 9px 7px !important;
+  display: flex;
+  color: #222;
+  list-style: none;
+  flex-direction: column;
+}
+
+.submenuMoreOption li {
+  color: black;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  /* justify-content: space-between; */
+  padding: 8px 12px;
+  cursor: pointer;
+  border-radius: 8px;
+  transition: background 0.2s;
+}
+
+.submenuMoreOption li:hover {
+  background: var(--color-hover);
+  color: #fff;
+}
+
+.submenuMoreOption .icon {
+  margin: 0;
+  font-size: 22px;
+  border-radius: 8px;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.submenuMoreOption .title-list {
+  margin: 0;
+  padding: 0;
+  font-size: 16px;
+  font-weight: 400;
+  line-height: 1;
+}
+.icon-option {
+  margin-right: 10px;
+}
+
+.date-picker-container {
+  display: inline-block;
+  margin-right: 8px;
+}
+
+.date-picker-container ::ng-deep .input-group {
+  width: auto;
+}
+
+.date-picker-container ::ng-deep .form-control {
+  width: 120px;
+  height: 32px;
+  font-size: 14px;
+}

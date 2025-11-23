@@ -1,0 +1,134 @@
+/* src/app/pages/assign-work-page/create-ai-job-page/create-ai-job-page.component.css */
+
+.create-ai-job-page {
+  min-height: 100vh;
+  background: white;
+  padding: 0;
+}
+
+/* Header Styles */
+.page-header {
+  background: white;
+  padding: 16px 24px;
+  border-bottom: 1px solid #e8e8e8;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.back-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  color: #666;
+  transition: all 0.3s;
+}
+
+.back-btn:hover {
+  background: #f0f2f5;
+  color: #1890ff;
+}
+
+.back-btn i {
+  font-size: 16px;
+}
+
+.page-title h1 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+  color: #262626;
+  line-height: 1.2;
+}
+
+.page-description {
+  margin: 4px 0 0 0;
+  color: #8c8c8c;
+  font-size: 14px;
+}
+
+/* AI Generator Container */
+.ai-generator-container {
+  /* padding: 24px; */
+  max-width: 100%;
+  margin: 0 auto;
+}
+
+/* Override AI Generator Styles for Full Page */
+.ai-generator-container ::ng-deep .ai-generator-section {
+  background: white;
+  /* border-radius: 8px; */
+  /* box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06); */
+  padding: 24px;
+}
+
+.ai-generator-container ::ng-deep .ai-generator-header {
+  display: none; /* Hide header since we have page header */
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .page-header {
+    padding: 12px 16px;
+  }
+  
+  .header-left {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  
+  .page-title h1 {
+    font-size: 20px;
+  }
+  
+  .ai-generator-container {
+    padding: 16px;
+  }
+}
+
+/* Loading States */
+.ai-generator-container ::ng-deep .processing-section {
+  text-align: center;
+  padding: 60px 20px;
+}
+
+/* Enhanced Upload Section */
+.ai-generator-container ::ng-deep .upload-section {
+  text-align: center;
+  padding: 40px 20px;
+}
+
+.ai-generator-container ::ng-deep .upload-description {
+  margin-bottom: 24px;
+}
+
+.ai-generator-container ::ng-deep .upload-area {
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+/* Results Section */
+.ai-generator-container ::ng-deep .suggestion-results {
+  animation: fadeInUp 0.5s ease-out;
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

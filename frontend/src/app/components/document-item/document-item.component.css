@@ -1,0 +1,140 @@
+.file-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background-color: #f9f9f9;
+  border-radius: 12px;
+  padding: 16px 20px;
+  margin-bottom: 12px;
+}
+.file-item:hover {
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+}
+.file-item:hover .file-actions {
+  display: flex;
+}
+.file-info {
+  display: flex;
+  align-items: center;
+}
+
+.file-icon {
+  font-size: 24px;
+  color: #888;
+  margin-right: 12px;
+}
+
+.file-details {
+  margin-left: 10px;
+}
+
+.file-details .file-name {
+  font-weight: 600;
+}
+
+.file-details .file-meta {
+  font-size: 13px;
+  color: #888;
+}
+
+.file-actions {
+  display: none;
+  align-items: center;
+  gap: 12px;
+}
+
+.btn-ask-ai {
+  background-color: white;
+  border: 1px solid #eee;
+  border-radius: 12px;
+  padding: 6px 12px;
+  color: #32cd32;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+
+.btn-ask-ai i {
+  color: #32cd32;
+}
+
+.more-options {
+  color: #aaa;
+  width: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 17px;
+}
+
+.icon-option {
+  margin-right: 10px;
+}
+::ng-deep .item-complete {
+  color: green !important;
+}
+::ng-deep .item-delete {
+  color: red !important;
+}
+
+.submenuMoreOption {
+  top: 10px;
+  right: 0;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  z-index: 99;
+  margin: 0 !important;
+  padding: 12px !important;
+  display: flex;
+  color: #222;
+  list-style: none;
+  flex-direction: column;
+}
+
+.submenuMoreOption li {
+  color: black;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  /* justify-content: space-between; */
+  padding: 8px 12px;
+  cursor: pointer;
+  border-radius: 8px;
+  transition: background 0.2s;
+}
+
+/* .submenuMoreOption li:hover {
+  background: #f79292;
+  color: #fff;
+} */
+
+.submenuMoreOption .icon {
+  margin: 0;
+  font-size: 22px;
+  border-radius: 8px;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.submenuMoreOption .title-list {
+  margin: 0;
+  padding: 0;
+  font-size: 16px;
+  font-weight: 400;
+  line-height: 1;
+}
+
+/* ----- */
+::ng-deep .ant-menu-title-content {
+  display: flex;
+  /* flex-direction: row; */
+  align-items: center;
+  transition: color 0.3s;
+}

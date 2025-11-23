@@ -1,0 +1,45 @@
+.assign-dropdown {
+  border: 1px solid #e1e4e8;
+  border-radius: 12px;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
+  padding: 12px;
+  width: 450px;
+  /* min-height: 300px; */
+}
+textarea {
+  width: 280px;
+}
+.desp-button-content {
+  display: flex;
+  align-items: center;
+  padding: 6px 8px;
+  border: 1px solid #ccc;
+  background: white;
+  font-weight: 500;
+  border-radius: 1rem;
+  font-weight: normal;
+  cursor: pointer;
+  font-size: 12px;
+  color: #5d5d5d;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 200px;
+  white-space: normal;
+  word-break: break-word;
+  display: inline-block;
+  line-height: 1.5;
+}
+.more-action {
+  display: flex;
+  justify-content: end;
+}
+.title-despJob {
+  font-weight: 600;
+  color: #24292f;
+}
+a {
+  display: flex;
+  align-items: center;
+}

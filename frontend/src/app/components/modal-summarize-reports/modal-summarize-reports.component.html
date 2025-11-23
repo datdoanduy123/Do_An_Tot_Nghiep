@@ -1,0 +1,24 @@
+<div class="container">
+  <div class="title">
+    <button
+      nz-button
+      nzType="primary"
+      class="upload-btn"
+      [nzLoading]="isLoadingButton"
+      (click)="fileInput.click()"
+    >
+      <i class="fas fa-cloud-upload-alt"></i>
+      <span> Tải lên </span>
+      <input #fileInput type="file" hidden (change)="onFileSelected($event)" />
+    </button>
+    <div class="btn">Tổng hợp báo cáo AI</div>
+  </div>
+  <div class="uploaded-files" *ngIf="uploadedFiles.length > 0">
+    <ul>
+      <li *ngFor="let file of uploadedFiles; index as i">
+        {{ file.name }}
+        <button (click)="removeFile(i)">❌</button>
+      </li>
+    </ul>
+  </div>
+</div>

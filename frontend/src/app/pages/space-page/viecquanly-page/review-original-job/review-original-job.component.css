@@ -1,0 +1,128 @@
+.modal {
+  background: white;
+  padding: 12px 12px 0px 12px;
+  width: 100%;
+  height: 100%;
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  font-size: 16px;
+  padding: 0px 0px 5px 0px;
+  border-bottom: 1px #ccc solid;
+}
+.modal-header .title {
+  font-weight: 600;
+  font-size: 20px;
+}
+.button-back {
+  font-size: 18px;
+  width: 25px;
+  height: 25px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-right: 10px;
+}
+
+.modal-body {
+  margin: 12px 8px 0px 8px;
+  width: 100%;
+}
+.modal-body p {
+  margin: 5px 0;
+}
+
+.title {
+  white-space: nowrap;
+  font-weight: 500;
+  font-size: 16px;
+}
+
+/* select */
+
+.select-container {
+  width: 100%;
+}
+.select-schedule {
+  display: flex;
+  flex-direction: column;
+}
+
+.select-schedule input {
+  text-align: center;
+  width: 30px;
+  height: 25px;
+  border: #0d6efd 1px solid;
+  border-radius: 5px;
+}
+.repeat-schedule {
+  display: flex;
+  align-items: center;
+}
+.more-options {
+  display: flex;
+  justify-content: space-between;
+}
+.table-data {
+  scrollbar-width: thin !important;
+}
+.table-data th,
+.table-data td {
+  border: 1px solid #ebebeb;
+}
+.action-file i:hover {
+  color: #0d6efd;
+}
+
+.btn {
+  height: 32px;
+  padding: 6px 12px;
+  margin-right: 8px;
+  margin-left: 5px;
+  background-color: #56adf5;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+.btn:hover {
+  background-color: #1976d2;
+}
+
+/* paganation */
+.ant-pagination {
+  display: flex;
+  justify-content: center;
+  margin: 12px 0px;
+}
+
+::ng-deep .select-container .selectedGroupBy {
+  min-width: 90px !important;
+  max-width: 90px !important;
+}
+::ng-deep .ant-table-pagination-right {
+  justify-content: center !important;
+}
+::ng-deep .table-data ::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+
+::ng-deep .table-data ::-webkit-scrollbar-thumb {
+  background: #888;
+  border-radius: 4px;
+}
+
+::ng-deep .table-data ::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
+
+.ant-table-tbody > tr > td {
+  white-space: normal;
+  word-break: break-word;
+}
+/*  */

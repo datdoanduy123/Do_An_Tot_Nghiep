@@ -1,0 +1,81 @@
+<div class="overlay">
+  <div class="update-container">
+    <h2 class="title">Cập nhật tiến độ</h2>
+
+    <form (ngSubmit)="onSubmit(progressForm)" #progressForm="ngForm">
+      <div class="form-group">
+        <label for="kienNghi">Kiến nghị đề xuất</label>
+        <input
+          type="text"
+          id="kienNghi"
+          placeholder="Text"
+          [(ngModel)]="form.kienNghi"
+          name="kienNghi"
+          required
+        />
+      </div>
+
+      <div class="form-group">
+        <label for="ketQua">Kết quả công việc</label>
+        <input
+          type="text"
+          id="ketQua"
+          placeholder="Text"
+          [(ngModel)]="form.ketQua"
+          name="ketQua"
+          required
+        />
+      </div>
+
+      <div class="form-group">
+        <label for="feedback">Feedback</label>
+        <input
+          type="text"
+          id="feedback"
+          placeholder="Text"
+          [(ngModel)]="form.feedback"
+          name="feedback"
+        />
+      </div>
+
+      <div class="form-group">
+        <label for="file">File báo cáo</label>
+        <label class="upload-btn">
+          <input type="file" hidden (change)="onFileSelected($event)" />
+          <i class="fas fa-cloud-upload-alt"></i>
+          <span>Upload</span>
+        </label>
+        <div class="namefile-selected" *ngIf="selectedFileName">
+          {{ selectedFileName }}
+        </div>
+      </div>
+    </form>
+    <div
+      style="
+        display: flex;
+        justify-content: flex-end;
+        align-items: center;
+        flex-direction: row;
+      "
+    >
+      <button
+        class="btn cancel"
+        nz-button
+        type="submit"
+        (click)="updateIsShowPopup()"
+      >
+        Hủy bỏ
+      </button>
+      <!-- <button (click)="updateIsShowPopup()" class="btn cancel">Hủy bỏ</button> -->
+      <button
+        (click)="onSubmit(progressForm)"
+        nz-button
+        nzType="primary"
+        type="submit"
+        [nzLoading]="isLoading"
+      >
+        Cập nhật
+      </button>
+    </div>
+  </div>
+</div>

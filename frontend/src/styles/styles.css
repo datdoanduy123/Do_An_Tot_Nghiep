@@ -1,0 +1,193 @@
+
+@import 'quill/dist/quill.snow.css';
+
+/* You can add global styles to this file, and also import other style files */
+:root {
+  --background-primary: #f44336; /* đỏ tươi */
+  --background-primary2: #951515; /* đỏ tươi */
+  --background-secondary: #f5c34a; /* đỏ tươi */
+  --icon-secondary: #ffd700; /* vàng */
+  --color-dark-bg: #800000; /* Nền tối: Đỏ sậm */
+  --color-light-bg: #ffdb58; /* Nền sáng: Vàng mù tạt */
+  --color-text: #2b0000; /* Chữ chính: Gần đen */
+  --color-hover: #f79292; /* Hover/Active: Đỏ neon */
+  --color-background-second: #fdeaea; /* Hover/Active: Đỏ neon */
+  user-select: none;
+}
+* {
+  font-family: "Poppins", sans-serif;
+}
+body,
+html {
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+}
+.space-10px {
+  width: 100%;
+  height: 10px;
+}
+.center-flex {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  height: 100%;
+}
+.flex {
+  display: flex;
+}
+
+.flex-column-start {
+  display: flex;
+  flex-direction: column;
+  justify-content: start;
+}
+
+.flex-space-between {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.flex-space-between-align-item-start {
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+}
+.m-r-5 {
+  margin-right: 5px;
+}
+.m-r-10 {
+  margin-right: 10px;
+}
+.m-b-5 {
+  margin-bottom: 5px;
+}
+.m-b-10 {
+  margin-bottom: 10px;
+}
+.m-l-10 {
+  margin-left: 10px;
+}
+.m-l-35 {
+  margin-left: 35px;
+}
+
+/* Đối với toàn bộ trang */
+::-webkit-scrollbar {
+  width: 8px; /* chiều rộng scrollbar dọc */
+  height: 8px; /* chiều cao scrollbar ngang */
+}
+
+/* Track (nền của scrollbar) */
+::-webkit-scrollbar-track {
+  background: #f0f0f0;
+  border-radius: 4px;
+}
+
+/* Thumb (nút cuộn) */
+::-webkit-scrollbar-thumb {
+  background-color: #888;
+  border-radius: 4px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+/* Hover thumb */
+::-webkit-scrollbar-thumb:hover {
+  background-color: #555;
+}
+
+/* responesive */
+.detailviecquanly-card {
+  width: 95%;
+}
+.task-card {
+  width: 95%;
+}
+@media (max-width: 1250px) {
+  .detailviecquanly-card {
+    width: 98%;
+  }
+  .task-card {
+    width: 98%;
+  }
+}
+@media (max-width: 480px) {
+  .detailviecquanly-card {
+    width: 98%;
+  }
+  .task-card {
+    width: 98%;
+  }
+}
+
+
+/* Custom Quill theme */
+.ql-snow {
+  border: none;
+}
+
+.ql-editor {
+  padding: 12px 15px;
+}
+
+.ql-editor.ql-blank::before {
+  font-style: normal;
+  color: #999;
+}
+
+/* Đảm bảo Quill hoạt động trong modal */
+.ant-modal .ql-container {
+  font-family: inherit;
+}
+.gap{
+    gap: 73px
+}
+.ant-modal-content {
+  border-radius: 16px !important;   /* Bo góc khung modal */
+  overflow: hidden;                 /* Đảm bảo header và footer cũng bo */
+}
+
+.ant-modal-header {
+  border-top-left-radius: 16px !important;
+  border-top-right-radius: 16px !important;
+}
+
+.ant-modal-footer {
+  border-bottom-left-radius: 16px !important;
+  border-bottom-right-radius: 16px !important;
+}
+
+.ant-modal {
+  border-radius: 16px !important;
+  overflow: hidden;
+}
+
+.align-center {
+  align-items: center;
+}
+h2{
+   color: #333;
+  margin-bottom: 0.5rem;
+  font-family: "PoppInins", sans-serif;
+}
+h5{
+    font-family: "PoppInins", sans-serif;
+      margin-bottom: 0.5rem;
+  color: #565656;
+
+}
+
+.border {
+  border-radius: 4px !important;
+  overflow: hidden;
+}
+/* Cho icon toggle */
+nz-switch .anticon {
+  color: white;
+  font-size: 14px;
+  line-height: 1;
+}
+

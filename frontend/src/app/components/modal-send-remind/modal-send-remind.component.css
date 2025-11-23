@@ -1,0 +1,25 @@
+::ng-deep .ant-modal-title {
+  font-size: 20px !important;
+}
+.title {
+  white-space: nowrap;
+  font-weight: 500;
+  font-size: 16px;
+  margin-bottom: 5px;
+}
+nz-select {
+  width: 180px;
+}
+nz-divider {
+  margin: 4px 0;
+}
+.container {
+  display: flex;
+  flex-wrap: nowrap;
+  padding: 8px;
+}
+.add-item {
+  flex: 0 0 auto;
+  padding: 5px;
+  display: block;
+}

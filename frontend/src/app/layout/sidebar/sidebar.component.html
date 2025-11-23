@@ -1,0 +1,137 @@
+<aside
+  class="sidebar"
+  [class.closed]="!isSidebarOpen"
+  [class.collapsed]="!isSidebarOpen"
+  [class.mobile]="isMobile"
+>
+  <ul>
+    <!-- Mobile menu items - Tổng hợp và Giao việc chỉ hiện trên mobile -->
+    <ng-container *ngIf="isMobile">
+      <li (click)="navigateAndCloseSidebar('')">
+        <i class="fa-solid fa-chart-bar icon-sidebar"></i>
+        <div class="title-list" *ngIf="isSidebarOpen">Tổng hợp</div>
+      </li>
+      
+      <li [ngClass]="{ active: isAssignWorkPage }" (click)="navigateAndCloseSidebar('/assignWork')">
+        <i class="fa-solid fa-user-plus icon-sidebar"></i>
+        <div class="title-list" *ngIf="isSidebarOpen">Giao việc</div>
+      </li>
+    </ng-container>
+
+    <!-- space -->
+    <li style="position: relative" (click)="toggleSpaceSubmenuTooltip($event)">
+      <div (click)="toggleSpaceSubmenuTooltip($event)">
+        <i
+          [ngClass]="{ active: isSpacePage && !isSidebarOpen }"
+          class="fa-solid fa-folder icon-sidebar"
+        ></i>
+      </div>
+      <!-- popup -->
+      <ul
+        class="SpaceSubmenuTooltip"
+        (click)="$event.stopPropagation()"
+        *ngIf="isSpaceSubmenuTooltip"
+      >
+        <li
+          [ngClass]="{ active: isViecduocgiaoPage }"
+          class="SubmenuTooltip"
+          (click)="navigateAndCloseSidebar('/viecduocgiao')"
+        >
+          <i class="fa-solid fa-list SubmenuTooltip icon-sidebar"></i>
+          <div class="SubmenuTooltip title-list">Việc đã giao</div>
+        </li>
+        <li
+          [ngClass]="{ active: isViecquanlyPage }"
+          class="SubmenuTooltip"
+          (click)="navigateAndCloseSidebar('/viecquanly')"
+        >
+          <i class="fa-solid fa-briefcase SubmenuTooltip icon-sidebar"></i>
+          <div class="SubmenuTooltip title-list">Việc quản lý</div>
+        </li>
+      </ul>
+      <div class="title-list" *ngIf="isSidebarOpen">Không gian</div>
+      <span
+        class="sidebar-tooltip"
+        *ngIf="!isSidebarOpen && !isSpaceSubmenuTooltip"
+        >Không gian</span
+      >
+      <!-- sub icon right -->
+      <i
+        style="font-size: 16px"
+        *ngIf="!isSpaceSubmenuOpen && isSidebarOpen"
+        class="fa-solid fa-chevron-down icon-sidebar-submenu"
+      ></i>
+      <i
+        style="font-size: 16px"
+        *ngIf="isSpaceSubmenuOpen && isSidebarOpen"
+        class="fa-solid fa-chevron-up icon-sidebar-submenu"
+      ></i>
+    </li>
+    <!-- extend menu -->
+     
+    <ul
+      *ngIf="
+        (isSpaceSubmenuOpen && isSidebarOpen) || (isSidebarOpen && isSpacePage)
+      "
+    >
+      <li
+        [ngClass]="{ active: isViecduocgiaoPage }"
+        class="submenu"
+        (click)="navigateAndCloseSidebar('/viecduocgiao')"
+      >
+        <i class="fa-solid fa-list icon-sidebar"></i>
+        <div class="sub-title-list" *ngIf="isSidebarOpen">Việc được giao</div>
+      </li>
+      <li
+        [ngClass]="{ active: isViecquanlyPage }"
+        class="submenu"
+        (click)="navigateAndCloseSidebar('/viecquanly')"
+      >
+        <i class="fa-solid fa-briefcase icon-sidebar"></i>
+        <div class="sub-title-list" *ngIf="isSidebarOpen">Việc quản lý</div>
+      </li>
+    </ul>
+    <!-- document -->
+    <li [ngClass]="{ active: isDocumentPage }" (click)="navigateAndCloseSidebar('/document')">
+      <i
+        [ngClass]="{ active: isDocumentPage && !isSidebarOpen }"
+        class="fa-solid fa-file icon-sidebar"
+      ></i>
+      <div class="title-list" *ngIf="isSidebarOpen">Tài liệu</div>
+      <span class="sidebar-tooltip" *ngIf="!isSidebarOpen">Tài liệu</span>
+    </li>
+    <!-- automation -->
+    <!-- <li [ngClass]="{ active: isAutomationPage }" (click)="navigateAndCloseSidebar('/automation')">
+      <i
+        [ngClass]="{ active: isAutomationPage && !isSidebarOpen }"
+        class="fa-solid fa-rocket icon-sidebar"
+      ></i>
+      <div class="title-list" *ngIf="isSidebarOpen">Automation</div>
+      <span class="sidebar-tooltip" *ngIf="!isSidebarOpen">Automation</span>
+    </li> -->
+    <!-- AIAgent -->
+    <li [ngClass]="{ active: isAIAgentPage }" (click)="navigateAndCloseSidebar('/ai-agent')">
+      <i
+        [ngClass]="{ active: isAIAgentPage && !isSidebarOpen }"
+        class="fa-solid fa-robot icon-sidebar"
+      ></i>
+      <div class="title-list" *ngIf="isSidebarOpen">AI Agent</div>
+      <span class="sidebar-tooltip" *ngIf="!isSidebarOpen">AI Agent</span>
+    </li>
+  </ul>
+  <!-- toggle button close/open sidebar - chỉ hiện trên desktop -->
+  <div class="sidebar-bottom-toggle" *ngIf="!isMobile">
+    <div (click)="toggleSidebar()">
+      <i
+        *ngIf="!isSidebarOpen"
+        class="fa-solid fa-circle-arrow-right icon-sidebar"
+      ></i>
+    </div>
+    <div (click)="toggleSidebar()">
+      <i
+        *ngIf="isSidebarOpen"
+        class="fa-solid fa-circle-arrow-left icon-sidebar"
+      ></i>
+    </div>
+  </div>
+</aside>

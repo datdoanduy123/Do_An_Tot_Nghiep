@@ -1,0 +1,170 @@
+.overlay-datetimePicker {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  z-index: 9999;
+  justify-content: center;
+  align-items: center;
+  background: rgba(0, 0, 0, 0.4);
+}
+.datetimepicker-container {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  height: 70vh;
+  width: 495px;
+  border-radius: 6px;
+  background-color: white;
+  padding: 15px 12px;
+  font-weight: normal;
+}
+.title-primary {
+  font-weight: 600;
+  font-size: 16px;
+}
+.date-time-group {
+  margin: 12px 12px 5px 12px;
+}
+
+.date-time-row {
+  display: flex;
+  margin-bottom: 8px;
+  border-radius: 6px;
+
+  font-size: 14px;
+}
+.date-time-row input {
+  padding: 8px;
+  border: 1px solid #ccc;
+  border-top-right-radius: 6px;
+  border-bottom-right-radius: 6px;
+  flex: 1;
+  box-sizing: border-box;
+  width: 110px;
+}
+
+.input-error {
+  border: 1px solid #f44336;
+  background: #fff0f0;
+}
+.tooltip-error {
+  color: #f44336;
+  font-size: 12px;
+  margin-left: 8px;
+}
+.box {
+  padding: 5px 10px;
+  border: 1px solid #ccc;
+  box-sizing: border-box;
+  background-color: white;
+}
+
+.date-box {
+  display: flex;
+  align-items: center;
+  justify-content: start;
+  border-right: none;
+  border-top-left-radius: 6px;
+  border-bottom-left-radius: 6px;
+  min-width: 120px;
+}
+/* datetime picker */
+.custom-day {
+  text-align: center;
+  padding: 0.185rem 0.25rem;
+  display: inline-block;
+  height: 1.5rem;
+  width: 1.5rem;
+}
+.ngb-dp-weekday {
+  color: red !important;
+}
+.custom-day.focused {
+  background-color: #e6e6e6;
+}
+.custom-day.range,
+.custom-day:hover {
+  background-color: rgb(255, 45, 96);
+  color: white;
+  border-radius: 50%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+.custom-day.faded {
+  background-color: #ff2d6057;
+}
+/*  */
+.confirm-container {
+  margin-top: 5px;
+  display: flex;
+  justify-content: end;
+}
+.btn {
+  padding: 6px 12px;
+  margin-right: 8px;
+  background-color: #56adf5;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+
+  &.secondary {
+    margin-top: 20px;
+  }
+}
+.btn.cancel {
+  background-color: #898989;
+}
+.btn.cancel:hover {
+  background-color: #696969;
+}
+.btn:hover {
+  background-color: #1976d2;
+}
+
+/* ---- */
+::ng-deep .ngb-dp-weekdays {
+  background-color: #f8f9fa !important;
+  color: #0dcaf0;
+}
+::ng-deep .ngb-dp-month-name {
+  background-color: #f8f9fa !important;
+}
+::ng-deep .ngb-dp-header {
+  background-color: #f8f9fa !important;
+}
+
+::ng-deep ngb-datepicker-navigation-select > .form-select {
+  border: 1px #ccc solid;
+  border-radius: 5px;
+}
+::ng-deep .ngb-dp-navigation-chevron {
+  color: #0d6efd;
+}
+::ng-deep .ant-tabs-content {
+  width: 300px !important;
+}
+::ng-deep .ant-tabs-content-holder {
+  display: flex;
+  justify-content: center;
+}
+
+::ng-deep .ant-tabs > .ant-tabs-nav,
+.ant-tabs > div > .ant-tabs-nav {
+  height: 35px;
+}
+::ng-deep .ant-picker-ranges {
+  width: 130px !important;
+}
+::ng-deep .ant-picker {
+  min-width: 170px;
+}
+::ng-deep .ant-picker-range {
+  min-width: 350px !important;
+}

@@ -1,0 +1,187 @@
+.task-detail-container {
+  margin: 16px 12px;
+  height: calc(
+    100vh - 100px
+  ); /* Chiều cao bằng viewport height trừ đi margin và padding */
+  overflow-y: scroll;
+  overflow-x: hidden;
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE 10+ */
+  
+  .header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-bottom: 12px;
+    
+  }
+
+  .btn {
+    padding: 6px 12px;
+    margin-right: 8px;
+    background-color: #56adf5;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    font-size: 13px;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+
+    &.secondary {
+      margin-top: 20px;
+    }
+  }
+  .btn:hover {
+    background-color: #1976d2;
+  }
+
+  .content {
+    margin-top: 20px;
+    h4 {
+      margin-bottom: 10px;
+    }
+
+    ul {
+      list-style: none;
+      padding-left: 20px;
+
+      li {
+        margin-bottom: 8px;
+      }
+
+      ul {
+        list-style-type: disc;
+        padding-left: 20px;
+      }
+    }
+
+    .tag {
+      font-size: 0.9em;
+      color: #3b82f6;
+
+      &.pink {
+        color: #ec4899;
+      }
+    }
+  }
+
+  .footer {
+    text-align: left;
+  }
+}
+.title {
+  display: flex;
+  align-items: center;
+}
+.title i {
+  font-size: 20px;
+  width: 25px;
+  height: 25px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.title-text {
+  font-weight: 600;
+  margin-left: 12px;
+  font-size: 19px;
+}
+
+.task-detail-container::-webkit-scrollbar {
+  display: none;
+}
+.task-description-content {
+  white-space: pre-wrap;
+  pointer-events: auto;       /* Cho phép tương tác */
+  user-select: text;          /* Cho phép bôi đen và copy */
+  max-height: 200px;          /* Giới hạn chiều cao ban đầu */
+  overflow: hidden;           /* Ẩn phần còn lại */
+  position: relative;
+}
+.task-description-content.expanded {
+  max-height: none;           /* Khi mở rộng thì hiện toàn bộ nội dung */
+}
+.show-more-btn {
+  color: #007bff;
+  cursor: pointer;
+  font-weight: 500;
+  display: block;
+  margin-top: 8px;
+}
+
+
+/*  css cotnet  */
+.task-description-box {
+  background: #ffffff;
+  border-radius: 16px;
+  border: 1px solid #f1f1f1;
+  padding: 24px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.06);
+  transition: all 0.3s ease;
+  margin-bottom: 20px;
+}
+
+.task-description-box:hover {
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.1);
+}
+
+.section-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.task-description-content {
+  color: #333;
+  font-size: 15px;
+  line-height: 1.7;
+  white-space: pre-line;
+  overflow: hidden;
+  position: relative;
+  max-height: 180px;
+  transition: max-height 0.4s ease;
+}
+
+.task-description-content.expanded {
+  max-height: none;
+}
+
+.task-description-content::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  height: 60px;
+  width: 100%;
+  background: linear-gradient(transparent, #fff);
+  pointer-events: none;
+  transition: opacity 0.3s;
+}
+
+.task-description-content.expanded::after {
+  opacity: 0;
+}
+
+.toggle-container {
+  text-align: right;
+  margin-top: 10px;
+}
+
+.toggle-btn {
+  border: none;
+  
+  color: white;
+  font-weight: 500;
+  border-radius: 8px;
+  padding: 8px 16px;
+  cursor: pointer;
+  transition: background 0.3s;
+}
+
+.toggle-btn:hover {
+  background: #8a0010;
+}

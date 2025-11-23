@@ -1,0 +1,18 @@
+<nz-modal
+  [(nzVisible)]="isVisible"
+  nzTitle="Chi tiết nội dung công việc"
+  (nzOnCancel)="handleCancel()"
+  [nzContent]="modalContent"
+  [nzFooter]="modalFooter"
+  nzWidth="800px">
+  
+  <ng-template #modalContent>
+    <div class="description-content" [innerHTML]="formatDescription(desp)"></div>
+  </ng-template>
+  
+  <ng-template #modalFooter>
+    <button nz-button nzType="default" (click)="handleCancel()">
+      Đóng
+    </button>
+  </ng-template>
+</nz-modal>

@@ -1,0 +1,35 @@
+<!-- <a
+  nz-dropdown
+  nzTrigger="click"
+  [nzDropdownMenu]="menu"
+  [nzVisible]="dropdownVisible"
+  (nzVisibleChange)="onDropdownVisibilityChange($event)"
+>
+  <div class="desp-button-content">
+    <span> 🔍 Nội dung </span>
+  </div>
+</a>
+<nz-dropdown-menu #menu="nzDropdownMenu" #menuRef="nzDropdownMenu">
+  <div class="assign-dropdown" nz-menu>
+    <div class="m-b-10">
+      <div style="width: 162px" class="title-despJob m-b-10">
+        Nội dung công việc:
+      </div> -->
+
+<div style="flex: 1">
+  <textarea
+    nz-input
+    placeholder=""
+    [(ngModel)]="description"
+    [nzAutosize]="{ minRows: 3, maxRows: 10 }"
+    [readonly]="!isEdit"
+  ></textarea>
+</div>
+<!-- </div> -->
+<!-- <div class="more-action">
+      <button (click)="toggleDropdown()" nz-button nzType="primary">
+        Xong
+      </button>
+    </div> -->
+<!-- </div>
+</nz-dropdown-menu> -->

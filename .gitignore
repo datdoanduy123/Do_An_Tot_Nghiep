@@ -1,0 +1,15 @@
+.vscode/
+.vs/
+.idea/
+bin/
+obj/
+/packages/
+riderModule.iml
+/_ReSharper.Caches/
+DocTask.Data/Migrations/
+DocTask.Api/.env
+DocTask.Api/appsettings.json
+DocTask.Api/appsettings.Development.json
+DocTask.Api/appsettings.Production.json
+DocTask.Api/appsettings.*.json
+.DS_Store

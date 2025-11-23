@@ -1,0 +1,21 @@
+<div class="layout-container">
+  <app-header></app-header>
+  <div style="display: flex; height: 100%; width: 100%; position: relative">
+    <app-sidebar></app-sidebar>
+
+    <div class="main-content" [class.mobile-with-bottom-nav]="isMobile">
+      <router-outlet></router-outlet>
+    </div>
+
+    <!-- Mobile overlay: click to close sidebar -->
+    <div
+      class="sidebar-overlay"
+      (click)="closeSidebarFromOverlay()"
+      [class.active]="isMobile && isSidebarOpen"
+    ></div>
+  </div>
+  
+  <!-- Bottom Navigation for Mobile -->
+  <app-bottom-navigation></app-bottom-navigation>
+</div>
+<app-toast></app-toast>

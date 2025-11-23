@@ -1,0 +1,108 @@
+<nz-modal
+  [(nzVisible)]="isVisible"
+  nzTitle="Thêm việc gốc mới"
+  (nzOnCancel)="handleCancel()"
+  (nzOnOk)="handleOk()"
+  [nzContent]="modalContent"
+  [nzFooter]="modalFooter"
+>
+  <ng-template #modalContent>
+    <div
+      class="select-person"
+      style="
+        padding-top: 10px;
+        padding-bottom: 10px;
+        display: flex;
+        align-items: center;
+      "
+    >
+      <div class="title-despJob">Tên công việc :</div>
+      <div style="flex: 1">
+        <input nz-input nzSize="default" [(ngModel)]="jobName" type="text" />
+      </div>
+    </div>
+    <div class="center-flex m-b-10">
+      <div class="title-despJob">Chọn lịch trình :</div>
+      <div style="flex: 1">
+        <nz-range-picker
+          [nzShowTime]="{ nzFormat: 'HH:mm' }"
+          nzFormat="yyyy-MM-dd HH:mm"
+          ngModel
+          (ngModelChange)="onChange($event)"
+        ></nz-range-picker>
+      </div>
+    </div>
+    
+    <div>
+        @if(isChoosePeriod) {
+           <div class="flex gap m-b-10 align-center">
+      <div>
+      <span class="title">Phân công :</span>
+        </div>
+      <div class="container-button-assignUser">
+        <app-modal-assign-person-to-job style="max-width:100%"
+          (Assigned)="getAssigned($event)"
+          
+        ></app-modal-assign-person-to-job>
+      </div>
+    </div>
+    <div class="align-center flex m-b-10" style="gap: 31px">
+      <div>
+      <span class="title">Chọn kỳ báo cáo :</span>
+      </div>
+      <div class="container-button-assignUser" *ngIf="isChoosePeriod">
+      <app-modal-assign-schedule
+        (frequencyOutput)="onFrequencySelect($event)"
+      ></app-modal-assign-schedule>
+      </div>
+      <nz-switch
+          [(ngModel)]="isChoosePeriod"
+          [nzCheckedChildren]="checkedTemplate"
+          [nzUnCheckedChildren]="unCheckedTemplate"
+        ></nz-switch>
+          <ng-template #unCheckedTemplate><nz-icon nzType="close" /></ng-template>
+          <ng-template #checkedTemplate><nz-icon nzType="check" /></ng-template>
+    </div>
+        }
+        @else {
+          <div class="align-center flex m-b-10">
+          <div class="label-text">
+            Chọn kì báo cáo và phân công : 
+          </div>      
+            <nz-switch
+          [(ngModel)]="isChoosePeriod"
+          [nzCheckedChildren]="checkedTemplate"
+          [nzUnCheckedChildren]="unCheckedTemplate"
+        ></nz-switch>
+          <ng-template #unCheckedTemplate><nz-icon nzType="close" /></ng-template>
+          <ng-template #checkedTemplate><nz-icon nzType="check" /></ng-template>
+          </div>
+          }
+         
+      </div>
+      
+    <div class="center-flex">
+      <div class="title-despJob">Nội dung công việc :</div>
+
+      <div style="flex: 1; margin-bottom: 10px">
+        <quill-editor
+          [(ngModel)]="description"
+          [modules]="quillConfig"
+          placeholder="Nhập nội dung công việc..."
+          style="min-height: 150px;">
+        </quill-editor>
+      </div>
+    </div>
+  </ng-template>
+  <ng-template #modalFooter>
+    <button nz-button nzType="default" (click)="handleCancel()">Hủy bỏ</button>
+    <button
+      nz-button
+      nzType="primary"
+      (click)="handleOk()"
+      [nzLoading]="isConfirmLoading"
+    >
+      Xác nhận
+    </button>
+  </ng-template>
+</nz-modal>

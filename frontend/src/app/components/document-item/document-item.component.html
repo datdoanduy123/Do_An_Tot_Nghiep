@@ -1,0 +1,48 @@
+<div class="file-item" (click)="navigateTo()">
+  <div class="file-info">
+    <i class="fa-solid fa-file file-icon"></i>
+    <div class="file-details">
+      <div class="file-name">{{ doc.fileName }}</div>
+      <div class="file-meta">Added on {{ convertDate(doc.uploadedAt) }}</div>
+    </div>
+  </div>
+  <div class="file-actions">
+    <button (click)="toggleShowAssignWork()" class="btn-ask-ai">
+      <i class="fas fa-robot"></i> <span>Ask AI</span>
+    </button>
+    <a
+      nz-dropdown
+      nzTrigger="click"
+      [nzDropdownMenu]="menu"
+      (click)="$event.stopPropagation()"
+    >
+      <i class="fas fa-ellipsis-v more-options"></i>
+    </a>
+    <nz-dropdown-menu #menu="nzDropdownMenu">
+      <ul nz-menu class="submenuMoreOption">
+        <li nz-menu-item class="item-complete">
+          <i class="fa-solid fa-circle-check icon-option"></i>
+          <p class="title-list">Đánh dấu đã xong</p>
+        </li>
+
+        <li
+          nz-menu-item
+          class="item-complete"
+          (click)="downloadFile(doc.fileId, doc.fileName); $event.stopPropagation()"
+        >
+          <i class="fa-solid fa-download icon-option"></i>
+          <p class="title-list">Tải file</p>
+        </li>
+
+        <li
+          nz-menu-item
+          (click)="showConfirm(doc.fileId); $event.stopPropagation()"
+          class="item-delete"
+        >
+          <i class="fa-solid fa-trash icon-option delete"></i>
+          <p class="title-list">Xóa</p>
+        </li>
+      </ul>
+    </nz-dropdown-menu>
+  </div>
+</div>

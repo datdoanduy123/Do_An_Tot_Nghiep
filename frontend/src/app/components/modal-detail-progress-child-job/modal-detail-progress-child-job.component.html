@@ -1,0 +1,52 @@
+<div class="progress-child-overlay">
+  <div class="modalProgressChildJob">
+    <div class="modalProgressChildJob-header">
+      <h2>📊 Chi tiết Tiến độ</h2>
+      <div class="btn-close" (click)="onClose()">✖</div>
+    </div>
+    <app-loading class="center-flex" *ngIf="isloading"></app-loading>
+    <div
+      *ngIf="!isloading && detailProgressTaskChildModel"
+      class="modalProgressChildJob-body"
+    >
+      <div class="info">
+        <p>
+          <strong>📝 Công việc:</strong>
+          {{ detailProgressTaskChildModel!.taskName }}
+        </p>
+        <p>
+          <strong>👤 Người thực hiện:</strong>
+          {{ detailProgressTaskChildModel!.assigneeFullName.join(", ") }}
+        </p>
+        <p>
+          <strong>⏳ Hạn hoàn thành:</strong>
+          {{ convertDateTime(detailProgressTaskChildModel!.dueDate) }}
+        </p>
+        <p>
+          <strong>✅ Trạng thái:</strong>
+          {{ convertStatusText(detailProgressTaskChildModel!.taskStatus) }}
+        </p>
+        <div class="progress-container">
+          <label>📈 Tiến độ:</label>
+          <div class="progress-bar">
+            <div
+              class="progress"
+              [style.width.%]="detailProgressTaskChildModel!.completionRate"
+            ></div>
+          </div>
+          <small>
+            {{
+              detailProgressTaskChildModel.completionRate * 1 | number : "1.2-2"
+            }}
+
+            %</small
+          >
+        </div>
+      </div>
+    </div>
+    <!-- 
+    <div class="modalProgressChildJob-footer">
+      <button class="btn" (click)="onClose()">Xong</button>
+    </div> -->
+  </div>
+</div>

@@ -1,0 +1,68 @@
+<!-- <a
+  nz-dropdown
+  nzTrigger="click"
+  [nzDropdownMenu]="menu"
+  (nzVisibleChange)="onDropdownVisibilityChange($event)"
+>
+  <div class="desp-button assign">
+    <ng-container *ngIf="assignSelected.length > 0; else assignPerson">
+      👤 Đã chọn người
+    </ng-container>
+    <ng-template #assignPerson> 👤 Chọn người</ng-template>
+  </div>
+</a> -->
+<!-- <nz-dropdown-menu #menu="nzDropdownMenu"> -->
+<div class="assign-dropdown">
+  <!-- <div class="header flex-space-between m-b-10"> -->
+  <!-- <div class="assign-title">Gán cho</div> -->
+  <div class="switch-button flex-space-between">
+    <ng-container *ngIf="!isSelectAssignUnit">
+      <nz-tree-select
+        nzPlaceHolder="Bấm để chọn người thực hiện"
+        [(ngModel)]="value"
+        [nzMaxTagCount]="3"
+        [nzMaxTagPlaceholder]="omittedPlaceHolder"
+        [nzNodes]="nodes"
+        [nzDefaultExpandAll]="true"
+        [nzAllowClear]="false"
+        [nzMultiple]="true"
+        (ngModelChange)="onChangeSelectTreeUser($event)"
+        (nzOpenChange)="onDropdownVisibilityChange($event)"
+      ></nz-tree-select>
+      <ng-template #omittedPlaceHolder let-omittedValues
+        >and {{ omittedValues.length }} more...</ng-template
+      >
+    </ng-container>
+    <ng-container *ngIf="isSelectAssignUnit">
+      <nz-tree-select
+        nzPlaceHolder="Bấm để chọn đơn vị thực hiện"
+        [(ngModel)]="value"
+        [nzMaxTagCount]="3"
+        [nzMaxTagPlaceholder]="omittedPlaceHolder"
+        [nzNodes]="nodes"
+        [nzDefaultExpandAll]="true"
+        [nzAllowClear]="false"
+        [nzMultiple]="true"
+        (ngModelChange)="onChangeSelectTreeUnit($event)"
+        (nzOpenChange)="onDropdownVisibilityChange($event)"
+      ></nz-tree-select>
+      <ng-template #omittedPlaceHolder let-omittedValues
+        >and {{ omittedValues.length }} more...</ng-template
+      >
+    </ng-container>
+    <div class="center-flex">
+      <div class="m-r-5 sub-title m-l-10">Đơn vị</div>
+      <nz-switch
+        [ngModel]="isSelectAssignUnit"
+        (ngModelChange)="onSwitchChange($event)"
+        [nzCheckedChildren]="checkedTemplate"
+        [nzUnCheckedChildren]="unCheckedTemplate"
+      ></nz-switch>
+      <ng-template #checkedTemplate><nz-icon nzType="check" /></ng-template>
+      <ng-template #unCheckedTemplate><nz-icon nzType="close" /></ng-template>
+    </div>
+  </div>
+
+  <!-- </div> -->
+</div>
+<!-- </nz-dropdown-menu> -->

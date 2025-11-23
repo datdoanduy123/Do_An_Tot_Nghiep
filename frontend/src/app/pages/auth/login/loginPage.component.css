@@ -1,0 +1,28 @@
+
+
+.auth-box {
+  width: 380px;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08);
+  padding: 28px;
+}
+.auth-button:hover {
+  background-color: #d32f2f;
+}
+
+/* .auth-button[disabled] {
+  opacity: 0.6;
+  cursor: not-allowed;
+} */
+
+/* Link quên mật khẩu */
+
+
+/* Responsive */
+@media (max-width: 420px) {
+  .auth-box {
+    width: 90%;
+    padding: 20px;
+  }
+}

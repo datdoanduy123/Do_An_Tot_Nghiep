@@ -1,0 +1,41 @@
+<div class="task-detail-container">
+  <div class="header">
+    <div class="title">
+      <i (click)="goBack()" class="fa-solid fa-arrow-left"></i>
+      <div class="title-text">Chi tiết nội dung công việc</div>
+    </div>
+    <button (click)="togglePopup()" class="btn primary">
+      Cập nhật tiến độ
+    </button>
+  </div>
+  
+
+
+    <div class="task-description-box">
+  <h3 class="section-title">📄 Mô tả công việc :</h3>
+
+  <div
+    class="task-description-content"
+    [class.expanded]="isExpanded"
+    [innerHTML]="formatDescription(description)"
+  ></div>
+
+  <div class="toggle-container" >
+    <button class="toggle-btn" (click)="isExpanded = !isExpanded">
+      {{ isExpanded ? 'Thu gọn' : 'Xem thêm' }}
+    </button>
+  </div>
+</div>
+
+
+  <div class = "progress-section">
+    <app-progress-schedule [taskId]="taskId"></app-progress-schedule>
+  </div>
+
+
+</div>
+<app-modal-update-progress
+  [taskId]="taskId"
+  *ngIf="isOpenPopup"
+  (closePopup)="onchildChangedShowPopup($event)"
+></app-modal-update-progress>

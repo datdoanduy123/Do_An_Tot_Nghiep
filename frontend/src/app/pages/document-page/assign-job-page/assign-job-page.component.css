@@ -1,0 +1,167 @@
+.modal-assign-work {
+  background: #fff;
+  width: 100%;
+  padding: 12px;
+  border-radius: 10px;
+  height: 90vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: #ccc 1px solid;
+  padding-bottom: 10px;
+  margin-bottom: 5px;
+}
+.inline-edit-input {
+  font-size: 18px;
+  font-weight: bold;
+  border: none;
+  background: transparent;
+  width: 100%;
+  outline: none;
+  padding: 4px;
+  cursor: text;
+}
+.modal-header .title {
+  font-size: 20px;
+  font-weight: 600;
+}
+.task-group {
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE 10+ */
+  margin-top: 10px;
+  flex-grow: 1;
+}
+.task-group .title {
+  font-size: 16px;
+  font-weight: 600;
+}
+.sub-task {
+  display: flex;
+  align-items: center;
+  margin-left: 10px;
+  margin-top: 4px;
+}
+
+.sub-task label {
+  margin: 0 8px;
+  flex: 1;
+}
+
+.icon {
+  margin-right: 8px;
+}
+
+.deadline {
+  font-size: 12px;
+  color: gray;
+}
+
+textarea {
+  width: 100%;
+  margin-top: 10px;
+  padding: 8px;
+  border-radius: 5px;
+  border: 1px solid #ccc;
+}
+
+.modal-bottom {
+  margin-top: 10px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.modal-bottom textarea {
+  flex: 1;
+  padding: 8px 50px 8px 8px;
+  margin: 0;
+  border: #ccc 1px solid;
+  border-radius: 5px;
+  resize: none;
+  overflow-y: scroll;
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE 10+ */
+}
+.ant-btn {
+  border-radius: 4px !important;
+}
+
+.btn {
+  min-width: 110px;
+  height: 36px;
+  padding: 6px 12px;
+  margin-right: 8px;
+  margin-left: 5px;
+  background-color: #56adf5;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+.btn.cancel {
+  background-color: #a1a1a1;
+}
+.btn.cancel:hover {
+  background-color: #818181;
+}
+.btn:hover {
+  background-color: #1976d2;
+}
+
+.upload-btn {
+  position: absolute;
+  top: 15px;
+  right: 6px;
+  display: flex;
+  align-items: center;
+  /* width: 0px; */
+  gap: 8px;
+  padding: 5px 8px;
+  margin-bottom: 10px;
+  border: 1px solid #ccc;
+  border-radius: 16px;
+  background-color: #fff;
+  color: #000;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.03);
+  transition: background-color 0.2s, border-color 0.2s;
+}
+
+.upload-btn:hover {
+  background-color: #f5f5f5;
+  border-color: #aaa;
+}
+
+.upload-btn i {
+  font-size: 16px;
+  color: #888;
+}
+/*  */
+::ng-deep .ant-collapse > .ant-collapse-item > .ant-collapse-header {
+  padding: 5px 0px;
+}
+::ng-deep .ant-collapse {
+  font-size: 17px;
+  font-weight: bold;
+}
+::ng-deep
+  .ant-collapse-ghost
+  > .ant-collapse-item
+  > .ant-collapse-content
+  > .ant-collapse-content-box {
+  padding: unset;
+}
+
+::ng-deep .ant-collapse-content > .ant-collapse-content-box {
+  padding: unset;
+}

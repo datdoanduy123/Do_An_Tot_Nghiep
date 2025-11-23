@@ -1,0 +1,132 @@
+<div class="mission-card">
+  <div class="content">
+    <!-- Job Name -->
+    <div class="form-group">
+      <label class="form-label">Tên công việc:</label>
+      <input
+        spellcheck="false"
+        [(ngModel)]="jobName"
+        nz-input
+        class="form-input"
+        placeholder="Nhập tên công việc"
+      />
+    </div>
+
+    <!-- Deadline -->
+    <div class="form-group">
+      <label class="form-label">Đặt thời hạn:</label>
+      <nz-range-picker
+        [nzShowTime]="{ nzFormat: 'HH:mm' }"
+        nzFormat="yyyy-MM-dd HH:mm"
+        ngModel
+        (ngModelChange)="onChange($event)"
+        class="form-input"
+      ></nz-range-picker>
+    </div>
+
+    <!-- Assign Person -->
+    <div class="form-group">
+      <label class="form-label">Phân công:</label>
+      <app-modal-assign-person-to-job
+        (Assigned)="getAssigned($event)"
+        class="form-input"
+      ></app-modal-assign-person-to-job>
+    </div>
+
+    <!-- Report Schedule -->
+    <div class="form-group">
+      <label class="form-label">Chọn kỳ báo cáo:</label>
+      <app-modal-assign-schedule
+        (frequencyOutput)="onFrequencySelect($event)"
+        class="form-input"
+      ></app-modal-assign-schedule>
+    </div>
+
+    <!-- Task Description -->
+    <div class="form-group form-group-full">
+      <label class="form-label">Nội dung công việc:</label>
+      <quill-editor
+        [(ngModel)]="task.description"
+        [modules]="quillConfig"
+        (onContentChanged)="onContentChanged($event)"
+        placeholder="Nhập nội dung"
+        class="form-editor"
+      ></quill-editor>
+    </div>
+  </div>
+
+  <!-- Action Buttons -->
+  <div class="action-buttons">
+    <!-- Confirm Button -->
+    <button
+      nz-button
+      nzType="primary"
+      nz-popover
+      nzPopoverTitle="Xác nhận giao việc"
+      [nzPopoverContent]="popTplConfirm"
+      [(nzPopoverVisible)]="visiblePopoverConfirmGiaoViec"
+      nzPopoverTrigger="click"
+      class="btn-confirm"
+    >
+      Xác nhận giao việc
+    </button>
+    <ng-template #popTplConfirm>
+      <div class="popover-content">
+        <p>Hành động này sẽ không thể hoàn tác?</p>
+        <div class="popover-actions">
+          <button
+            nz-button
+            nzSize="small"
+            (click)="onCancelConfirmGiaoViec()"
+          >
+            Huỷ
+          </button>
+          <button
+            nz-button
+            nzType="primary"
+            nzSize="small"
+            (click)="confirmGiaoViec()"
+          >
+            Xác nhận
+          </button>
+        </div>
+      </div>
+    </ng-template>
+
+    <!-- Cancel Button -->
+    <button
+      nz-button
+      nzType="primary"
+      nz-popover
+      nzPopoverTitle="Hủy giao việc"
+      [nzPopoverContent]="popTplCancel"
+      [(nzPopoverVisible)]="visiblePopoverConfirmHuyGiaoViec"
+      nzPopoverTrigger="click"
+      class="btn-cancel"
+    >
+      Hủy giao việc
+    </button>
+    <ng-template #popTplCancel>
+      <div class="popover-content">
+        <p>Dữ liệu bạn vừa nhập sẽ mất hết?</p>
+        <div class="popover-actions">
+          <button
+            nz-button
+            nzSize="small"
+            (click)="onCancelConfirmHuyGiaoViec()"
+          >
+            Huỷ
+          </button>
+          <button
+            nz-button
+            nzType="primary"
+            nzSize="small"
+            (click)="confirmHuyGiaoViec()"
+          >
+            Xác nhận
+          </button>
+        </div>
+      </div>
+    </ng-template>
+  </div>
+</div>

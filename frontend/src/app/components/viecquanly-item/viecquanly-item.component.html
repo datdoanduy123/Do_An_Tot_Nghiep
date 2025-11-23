@@ -1,0 +1,261 @@
+                                                                                                                                                                <div class="task-card" (click)="navigateToDetail()">
+  <i class="fa-regular fa-clipboard"></i>
+  <div class="content">
+    <div class="task-title">{{ viecquanly.title }}</div>
+    <div class="task-meta">
+      <button class="desp-button m-r-10">
+        📅
+        <ng-container *ngIf="viecquanly.startDate; else dueDate">
+          {{ convertDate(viecquanly.startDate) }}
+          -
+          {{ convertDate(viecquanly.dueDate) }}
+        </ng-container>
+        <ng-template #dueDate>Lỗi thời hạn</ng-template>
+      </button>
+      <div (click)="$event.stopPropagation(); $event.preventDefault()">
+        <div class="container-button-content">
+          <div class="desp-button" (click)="showModalDesp()">
+            <span> 🔍 Nội dung </span>
+          </div>
+        </div>
+      </div>
+      
+      <div class="progress-bar">
+        <nz-progress
+          [nzPercent]="isValidPercent(viecquanly.percentageComplete) ? viecquanly.percentageComplete : 0"
+          nzStatus="active"
+        ></nz-progress>
+      </div>
+
+    </div>
+  </div>
+  <div class="task-actions">
+   <div style="display: flex; gap: 8px;">
+  <button class="border"
+    nz-button
+    nzType="primary"
+    style="
+      flex: 1;
+      width: 100%;
+      background: #17a2b8 !important;
+      border-color: #17a2b8 !important;
+    "
+    (click)="
+      showModalAddChildJob();
+      $event.stopPropagation();
+      $event.preventDefault()
+    "
+  >
+    Thêm việc con
+  </button>
+  <button class="border"
+  style="flex: 1;"
+        style="background: #ffc107 !important; border-color: #ffc107 !important"
+        nz-button
+        nzType="primary"
+        (click)="
+          showModalEdit(); $event.stopPropagation(); $event.preventDefault()
+        "
+      >
+        Sửa
+      </button>
+  
+</div>
+  
+    <div style="display: flex; 
+    gap:3px">
+      <button class="m-r-5 border" 
+    nz-button
+    nzType="primary"
+    style="
+    flex:1;
+    width: 104px;
+      background: #40a9ff !important;
+      border-color: #40a9ff !important;
+    "
+    (click)="goReviewPage()"
+  >
+    Rà soát
+  </button>
+      <button class="border" style="flex:1; width: 86px;align-items: center;
+  justify-content: center;"
+        
+        nz-button
+        nzType="primary"
+        (click)="
+          toggleShowModalTienDo();
+          $event.stopPropagation();
+          $event.preventDefault()
+        ">
+        Tiến độ
+      </button>
+      <!-- <button
+        style="background: #ffc107 !important; border-color: #ffc107 !important"
+        nz-button
+        nzType="primary"
+        (click)="
+          showModalEdit(); $event.stopPropagation(); $event.preventDefault()
+        "
+      >
+        Sửa
+      </button> -->
+    </div>
+  </div>
+</div>
+
+<app-modal-detail-progress-original-job
+  *ngIf="isShowModalTienDo"
+  [viecGoc]="viecquanly"
+  (isShowModal)="closeModalTienDo($event)"
+></app-modal-detail-progress-original-job>
+
+<app-modal-detail-despcription-job
+  [desp]="viecquanly.description"
+></app-modal-detail-despcription-job>
+<nz-modal
+  [(nzVisible)]="isVisibleModalEdit"
+  nzTitle="Sửa công việc"
+  (nzOnCancel)="handleCancel()"
+  (nzOnOk)="handleEditDirect()"
+  [nzContent]="modalContent"
+  [nzFooter]="modalFooter"
+>
+  <ng-template #modalContent>
+    <div class="flex">
+      <div class="m-b-5 m-r-10">Sửa tên công việc mới</div>
+      <nz-switch
+        [(ngModel)]="isEditTitleTask"
+        [nzCheckedChildren]="checkedTemplate"
+        [nzUnCheckedChildren]="unCheckedTemplate"
+        [nzDisabled]="viecquanly.percentageComplete === 100"
+
+      ></nz-switch>
+    </div>
+    <input
+      *ngIf="isEditTitleTask"
+      style="width: 60%"
+      class="m-b-10"
+      nz-input
+      placeholder=""
+      [(ngModel)]="jobname"
+      type="text"
+    />
+    <!--  -->
+    <div class="flex">
+      <div class="m-b-5 m-r-10">Sửa nội dung công việc</div>
+      <nz-switch
+        [(ngModel)]="isEditDespTask"
+        [nzCheckedChildren]="checkedTemplate"
+        [nzUnCheckedChildren]="unCheckedTemplate"
+      ></nz-switch>
+    </div>
+    <textarea
+      *ngIf="isEditDespTask"
+      class="m-b-10"
+      rows="4"
+      nz-input
+      [(ngModel)]="despcriptionJob"
+    ></textarea>
+    <!--  -->
+    <div class="flex">
+      <div class="m-b-5 m-r-10">Sửa thời hạn</div>
+      <nz-switch
+        [(ngModel)]="isEditDateTimeTask"
+        [nzCheckedChildren]="checkedTemplate"
+        [nzUnCheckedChildren]="unCheckedTemplate"
+      ></nz-switch>
+      <ng-template #checkedTemplate><nz-icon nzType="check" /></ng-template>
+      <ng-template #unCheckedTemplate><nz-icon nzType="close" /></ng-template>
+    </div>
+    <nz-range-picker
+      *ngIf="isEditDateTimeTask"
+      class="m-b-10"
+      [nzShowTime]="{ nzFormat: 'HH:mm' }"
+      nzFormat="yyyy-MM-dd HH:mm"
+      ngModel
+      (ngModelChange)="onChange($event)"
+    ></nz-range-picker>
+    <!--  -->
+  </ng-template>
+  <ng-template #modalFooter>
+    <button nz-button nzType="default" (click)="handleCancel()">Hủy bỏ</button>
+    <button
+  nz-button
+  nzType="primary"
+    #confirmBtn
+
+  (click)="this.isVisibleModalAddJob=false; handleEditDirect()"
+  [nzLoading]="isOkLoading"
+>
+  Xác nhận
+</button>
+
+  </ng-template>
+</nz-modal>  
+<nz-modal
+  [nzVisible]="isVisibleModalAddJob"
+  nzTitle="Thêm việc con"
+  (nzOnCancel)="closeModalAddChildJob()"
+  [nzContent]="modalContent2"
+  [nzFooter]="modalFooter2"
+>
+  <ng-template #modalContent2>
+    <div class="addJob">
+    <edit-app-misson-item
+      [taskIdParent]="viecquanly.taskId"
+      (closeEdit)="closeModalAddChildJob()"
+    ></edit-app-misson-item>
+    </div>
+  </ng-template>
+  <ng-template #modalFooter2>
+      <!-- <button
+        nz-button
+        nzType="primary"
+        nz-popover
+        nzPopoverTitle="Bạn chắc chắn muốn giao việc ?"
+        [nzPopoverContent]="popTplConfirm"
+        [(nzPopoverVisible)]="visiblePopoverConfirmGiaoViec"
+        nzPopoverTrigger="click"
+      >
+        Xác nhận giao việc 1
+      </button>
+      <ng-template #popTplConfirm>
+        <div style="max-width: 200px">
+          <p>Hành động này sẽ không thể hoàn tác ?</p>
+          <div
+            class="custom-footer"
+            style="display: flex; justify-content: end; margin-top: 8px"
+          >
+            <button
+              nz-button
+              nzSize="small"
+              (click)="onCancelConfirmGiaoViec()"
+              style="margin-right: 8px"
+            >
+              Huỷ
+            </button>
+            <button
+              nz-button
+              nzType="primary"
+              nzSize="small"
+              (click)="confirmGiaoViec()"
+            >
+              Xác nhận
+            </button>
+          </div>
+        </div>
+      </ng-template> -->
+    <!-- <button nz-button nzType="default" (click)="closeModalAddChildJob()">
+      Hủy bỏ
+    </button> -->
+    <!-- ❌ BỎ button này vì component con đã có nút submit -->
+    <!-- <button
+      nz-button
+      nzType="primary"
+      (click)="handleEditDirect()"
+      [nzLoading]="isOkLoading"
+    >
+      Xác nhận
+    </button> -->
+  </ng-template>
+</nz-modal>

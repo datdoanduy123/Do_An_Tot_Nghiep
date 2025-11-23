@@ -1,0 +1,25 @@
+<div class="container">
+  <button
+    nz-button
+    nzType="primary"
+    class="upload-btn"
+    [nzLoading]="isLoadingButton"
+    (click)="fileInput.click()"
+  >
+    <i class="fas fa-cloud-upload-alt"></i>
+    <span> Tải lên </span>
+    <input #fileInput type="file" hidden (change)="onFileSelected($event)" />
+  </button>
+  <app-file-item
+    *ngFor="let doc of documents"
+    [doc]="doc"
+    (preview)="previewFile($event)"
+  ></app-file-item>
+  <app-loading class="center-flex" *ngIf="isLoading"></app-loading>
+  <app-page-empty 
+  
+    class="center-flex"
+    *ngIf="!isLoading && documents.length == 0"
+  ></app-page-empty>
+  <app-modal-view-file></app-modal-view-file>
+</div>

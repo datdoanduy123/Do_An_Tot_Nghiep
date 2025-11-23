@@ -1,0 +1,48 @@
+<div class="viecquanly-detail-container">
+  <div class="header">
+    <div class="title">
+      <i (click)="goBack()" class="fa-solid fa-arrow-left"></i>
+      <div class="title-text">Chi tiết công việc quản lý</div>
+    </div>
+    <div class="search">
+      <nz-input-group [nzSuffix]="suffixIconSearch">
+        <input
+          type="text"
+          [(ngModel)]="textSearch"
+          (ngModelChange)="onSearchChange($event)"
+          nz-input
+          placeholder="Tìm kiếm công việc"
+        />
+      </nz-input-group>
+      <ng-template #suffixIconSearch>
+        <nz-icon nzType="search" />
+      </ng-template>
+    </div>
+  </div>
+  <div class="body">
+    <div>
+      <ng-container *ngFor="let item of listData">
+        <app-detail-viecquanly-item
+          [detailViecquanlyModel]="item"
+          [openedMoreOptionId]="openedMoreOptionId"
+          (taskDeleted)="onTaskDeleted($event)">
+          (toggleMoreOption)="onToggleMoreOption($event)"
+          (taskIdDelte)="onTaskDelte($event)"
+        ></app-detail-viecquanly-item>
+      </ng-container>
+    </div>
+    <app-loading class="center-flex" *ngIf="isLoading"></app-loading>
+    <app-page-empty
+      class="center-flex"
+      *ngIf="!isLoading && listData.length == 0"
+    ></app-page-empty>
+    <nz-pagination
+  [nzPageIndex]="paginationState.currentPage"
+  [nzPageSize]="paginationState.pageSize"
+  [nzTotal]="paginationState.totalItems"
+  (nzPageIndexChange)="onPageChange($event)"
+  nzShowSizeChanger="false"
+></nz-pagination>
+
+  </div>
+</div>

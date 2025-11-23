@@ -1,0 +1,15 @@
+<div class="bottom-navigation" *ngIf="isMobile">
+  <div class="nav-container">
+    <div 
+      *ngFor="let item of navigationItems" 
+      class="nav-item"
+      [class.active]="isActive(item.route)"
+      (click)="item.key === 'summary' ? showSummaryInfo() : navigateTo(item.route)"
+    >
+      <div class="nav-icon">
+        <i [class]="item.icon"></i>
+      </div>
+      <span class="nav-label">{{ item.label }}</span>
+    </div>
+  </div>
+</div>
