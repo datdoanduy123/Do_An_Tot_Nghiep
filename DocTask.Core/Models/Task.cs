@@ -37,6 +37,21 @@ public partial class Task
 
     public bool? IsDeleted { get; set; } = false;
 
+    /// <summary>
+    /// Ước tính số giờ cần để hoàn thành task
+    /// </summary>
+    public decimal? EstimatedHours { get; set; }
+    
+    /// <summary>
+    /// Task có được AI generate không?
+    /// </summary>
+    public bool IsAIGenerated { get; set; } = false;
+    
+    /// <summary>
+    /// Task có được auto-assigned không?
+    /// </summary>
+    public bool IsAutoAssigned { get; set; } = false;
+
     public virtual User? Assignee { get; set; }
 
     public virtual Frequency? Frequency { get; set; }
@@ -52,4 +67,10 @@ public partial class Task
     public virtual ICollection<Taskunitassignment> Taskunitassignments { get; set; } = new List<Taskunitassignment>();
 
     public virtual ICollection<User> Users { get; set; } = new List<User>();
+    
+    // Navigation properties mới cho K-means và AI features
+    public virtual ICollection<TaskSkillRequirement> SkillRequirements { get; set; } = new List<TaskSkillRequirement>();
+    
+    public virtual ICollection<AssignmentHistory> AssignmentHistories { get; set; } = new List<AssignmentHistory>();
 }
+

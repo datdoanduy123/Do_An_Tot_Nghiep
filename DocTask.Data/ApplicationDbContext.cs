@@ -55,6 +55,24 @@ public partial class ApplicationDbContext : DbContext
 
     public virtual DbSet<Userrole> Userroles { get; set; }
 
+    // DbSets mới cho K-means clustering và AI features
+    public virtual DbSet<Skill> Skills { get; set; }
+    
+    public virtual DbSet<UserSkill> UserSkills { get; set; }
+    
+    public virtual DbSet<TaskSkillRequirement> TaskSkillRequirements { get; set; }
+    
+    public virtual DbSet<EmployeeProfile> EmployeeProfiles { get; set; }
+    
+    public virtual DbSet<EmployeeCluster> EmployeeClusters { get; set; }
+    
+    public virtual DbSet<WorkloadMetric> WorkloadMetrics { get; set; }
+    
+    public virtual DbSet<AssignmentHistory> AssignmentHistories { get; set; }
+    
+    public virtual DbSet<PerformanceReview> PerformanceReviews { get; set; }
+
+
 //     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
 // #warning To protect potentially sensitive information in your connection string, you should move it out of source code. You can avoid scaffolding the connection string by using the Name= syntax to read it from configuration - see https://go.microsoft.com/fwlink/?linkid=2131148. For more guidance on storing connection strings, see https://go.microsoft.com/fwlink/?LinkId=723263.
 //         => optionsBuilder.UseSqlServer("Server=123.31.20.167,1435;Database=DoctaskAI;User ID=sa;Password=Pisa123;Encrypt=True;TrustServerCertificate=True");
@@ -406,6 +424,20 @@ public partial class ApplicationDbContext : DbContext
                 .HasMaxLength(255)
                 .HasColumnName("title");
             entity.Property(e => e.UnitId).HasColumnName("unitId");
+            
+            // Các trường mới cho AI features
+            entity.Property(e => e.EstimatedHours)
+                .HasColumnType("decimal(7,2)")
+                .HasColumnName("estimatedHours");
+            
+            entity.Property(e => e.IsAIGenerated)
+                .HasDefaultValue(false)
+                .HasColumnName("isAIGenerated");
+            
+            entity.Property(e => e.IsAutoAssigned)
+                .HasDefaultValue(false)
+                .HasColumnName("isAutoAssigned");
+
 
             entity.HasOne(d => d.Assignee).WithMany(p => p.Tasks)
                 .HasForeignKey(d => d.AssigneeId)
@@ -602,8 +634,397 @@ public partial class ApplicationDbContext : DbContext
                 .HasConstraintName("fk_userrole_user");
         });
 
+        // ========== CẤU HÌNH CHO CÁC ENTITIES MỚI (K-MEANS & AI FEATURES) ==========
+        
+        // 1. Skill Entity
+        modelBuilder.Entity<Skill>(entity =>
+        {
+            entity.ToTable("skill");
+            
+            entity.HasKey(e => e.SkillId);
+            
+            entity.Property(e => e.SkillId).HasColumnName("skillId");
+            
+            entity.Property(e => e.SkillName)
+                .IsRequired()
+                .HasMaxLength(200)
+                .HasColumnName("skillName");
+            
+            entity.Property(e => e.Category)
+                .HasMaxLength(100)
+                .HasColumnName("category");
+            
+            entity.Property(e => e.Description)
+                .HasColumnName("description");
+            
+            entity.Property(e => e.CreatedAt)
+                .HasDefaultValueSql("(getdate())")
+                .HasColumnType("datetime")
+                .HasColumnName("createdAt");
+            
+            entity.Property(e => e.IsActive)
+                .HasDefaultValue(true)
+                .HasColumnName("isActive");
+        });
+        
+        // 2. UserSkill Entity
+        modelBuilder.Entity<UserSkill>(entity =>
+        {
+            entity.ToTable("user_skill");
+            
+            entity.HasKey(e => e.UserSkillId);
+            
+            entity.Property(e => e.UserSkillId).HasColumnName("userSkillId");
+            entity.Property(e => e.UserId).HasColumnName("userId");
+            entity.Property(e => e.SkillId).HasColumnName("skillId");
+            
+            entity.Property(e => e.ProficiencyLevel)
+                .HasColumnName("proficiencyLevel");
+            
+            entity.Property(e => e.YearsOfExperience)
+                .HasColumnType("decimal(5,2)")
+                .HasColumnName("yearsOfExperience");
+            
+            entity.Property(e => e.VerifiedBy)
+                .HasColumnName("verifiedBy");
+            
+            entity.Property(e => e.VerifiedAt)
+                .HasColumnType("datetime")
+                .HasColumnName("verifiedAt");
+            
+            entity.Property(e => e.CreatedAt)
+                .HasDefaultValueSql("(getdate())")
+                .HasColumnType("datetime")
+                .HasColumnName("createdAt");
+            
+            entity.Property(e => e.UpdatedAt)
+                .HasColumnType("datetime")
+                .HasColumnName("updatedAt");
+            
+            // Relationships
+            entity.HasOne(d => d.User)
+                .WithMany(p => p.UserSkills)
+                .HasForeignKey(d => d.UserId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("FK_UserSkill_User");
+            
+            entity.HasOne(d => d.Skill)
+                .WithMany(p => p.UserSkills)
+                .HasForeignKey(d => d.SkillId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("FK_UserSkill_Skill");
+            
+            entity.HasOne(d => d.Verifier)
+                .WithMany()
+                .HasForeignKey(d => d.VerifiedBy)
+                .OnDelete(DeleteBehavior.SetNull)
+                .HasConstraintName("FK_UserSkill_Verifier");
+        });
+        
+        // 3. TaskSkillRequirement Entity
+        modelBuilder.Entity<TaskSkillRequirement>(entity =>
+        {
+            entity.ToTable("task_skill_requirement");
+            
+            entity.HasKey(e => e.TaskSkillRequirementId);
+            
+            entity.Property(e => e.TaskSkillRequirementId).HasColumnName("taskSkillRequirementId");
+            entity.Property(e => e.TaskId).HasColumnName("taskId");
+            entity.Property(e => e.SkillId).HasColumnName("skillId");
+            
+            entity.Property(e => e.RequiredLevel)
+                .HasColumnName("requiredLevel");
+            
+            entity.Property(e => e.Importance)
+                .HasDefaultValue(2)
+                .HasColumnName("importance");
+            
+            entity.Property(e => e.IsAutoExtracted)
+                .HasDefaultValue(false)
+                .HasColumnName("isAutoExtracted");
+            
+            entity.Property(e => e.CreatedAt)
+                .HasDefaultValueSql("(getdate())")
+                .HasColumnType("datetime")
+                .HasColumnName("createdAt");
+            
+            // Relationships
+            entity.HasOne(d => d.Task)
+                .WithMany(p => p.SkillRequirements)
+                .HasForeignKey(d => d.TaskId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("FK_TaskSkillRequirement_Task");
+            
+            entity.HasOne(d => d.Skill)
+                .WithMany(p => p.TaskSkillRequirements)
+                .HasForeignKey(d => d.SkillId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("FK_TaskSkillRequirement_Skill");
+        });
+        
+        // 4. EmployeeProfile Entity
+        modelBuilder.Entity<EmployeeProfile>(entity =>
+        {
+            entity.ToTable("employee_profile");
+            
+            entity.HasKey(e => e.EmployeeProfileId);
+            
+            entity.Property(e => e.EmployeeProfileId).HasColumnName("employeeProfileId");
+            entity.Property(e => e.UserId).HasColumnName("userId");
+            
+            entity.Property(e => e.TotalYearsOfExperience)
+                .HasColumnType("decimal(5,2)")
+                .HasColumnName("totalYearsOfExperience");
+            
+            entity.Property(e => e.AverageSkillLevel)
+                .HasColumnType("decimal(3,2)")
+                .HasColumnName("averageSkillLevel");
+            
+            entity.Property(e => e.ProductivityScore)
+                .HasColumnType("decimal(5,4)")
+                .HasColumnName("productivityScore");
+            
+            entity.Property(e => e.CurrentWorkloadPercentage)
+                .HasColumnType("decimal(5,2)")
+                .HasColumnName("currentWorkloadPercentage");
+            
+            entity.Property(e => e.AvailableHoursPerWeek)
+                .HasColumnType("decimal(5,2)")
+                .HasColumnName("availableHoursPerWeek");
+            
+            entity.Property(e => e.AveragePerformanceRating)
+                .HasColumnType("decimal(3,2)")
+                .HasColumnName("averagePerformanceRating");
+            
+            entity.Property(e => e.CompletedTasksCount)
+                .HasDefaultValue(0)
+                .HasColumnName("completedTasksCount");
+            
+            entity.Property(e => e.OnTimeCompletionCount)
+                .HasDefaultValue(0)
+                .HasColumnName("onTimeCompletionCount");
+            
+            entity.Property(e => e.LastUpdated)
+                .HasDefaultValueSql("(getdate())")
+                .HasColumnType("datetime")
+                .HasColumnName("lastUpdated");
+            
+            entity.Property(e => e.Status)
+                .HasMaxLength(20)
+                .HasDefaultValue("Active")
+                .HasColumnName("status");
+            
+            // Relationship
+            entity.HasOne(d => d.User)
+                .WithOne(p => p.EmployeeProfile)
+                .HasForeignKey<EmployeeProfile>(d => d.UserId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("FK_EmployeeProfile_User");
+        });
+        
+        // 5. EmployeeCluster Entity
+        modelBuilder.Entity<EmployeeCluster>(entity =>
+        {
+            entity.ToTable("employee_cluster");
+            
+            entity.HasKey(e => e.EmployeeClusterId);
+            
+            entity.Property(e => e.EmployeeClusterId).HasColumnName("employeeClusterId");
+            entity.Property(e => e.UserId).HasColumnName("userId");
+            
+            entity.Property(e => e.ClusterId)
+                .HasColumnName("clusterId");
+            
+            entity.Property(e => e.ClusterName)
+                .HasMaxLength(100)
+                .HasColumnName("clusterName");
+            
+            entity.Property(e => e.DistanceToCenter)
+                .HasColumnType("decimal(10,6)")
+                .HasColumnName("distanceToCenter");
+            
+            entity.Property(e => e.ConfidenceScore)
+                .HasColumnType("decimal(5,4)")
+                .HasColumnName("confidenceScore");
+            
+            entity.Property(e => e.ModelVersion)
+                .HasMaxLength(50)
+                .HasDefaultValue("1.0")
+                .HasColumnName("modelVersion");
+            
+            entity.Property(e => e.ClusteredAt)
+                .HasDefaultValueSql("(getdate())")
+                .HasColumnType("datetime")
+                .HasColumnName("clusteredAt");
+            
+            entity.Property(e => e.FeatureVector)
+                .HasColumnName("featureVector");
+            
+            // Relationship
+            entity.HasOne(d => d.User)
+                .WithOne(p => p.EmployeeCluster)
+                .HasForeignKey<EmployeeCluster>(d => d.UserId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("FK_EmployeeCluster_User");
+        });
+        
+        // 6. WorkloadMetric Entity
+        modelBuilder.Entity<WorkloadMetric>(entity =>
+        {
+            entity.ToTable("workload_metric");
+            
+            entity.HasKey(e => e.WorkloadMetricId);
+            
+            entity.Property(e => e.WorkloadMetricId).HasColumnName("workloadMetricId");
+            entity.Property(e => e.UserId).HasColumnName("userId");
+            
+            entity.Property(e => e.ActiveTasksCount)
+                .HasColumnName("activeTasksCount");
+            
+            entity.Property(e => e.EstimatedHoursRemaining)
+                .HasColumnType("decimal(7,2)")
+                .HasColumnName("estimatedHoursRemaining");
+            
+            entity.Property(e => e.WorkloadPercentage)
+                .HasColumnType("decimal(5,2)")
+                .HasColumnName("workloadPercentage");
+            
+            entity.Property(e => e.AvailableHours)
+                .HasColumnType("decimal(5,2)")
+                .HasColumnName("availableHours");
+            
+            entity.Property(e => e.SnapshotDate)
+                .HasDefaultValueSql("(getdate())")
+                .HasColumnType("datetime")
+                .HasColumnName("snapshotDate");
+            
+            // Relationship
+            entity.HasOne(d => d.User)
+                .WithMany(p => p.WorkloadMetrics)
+                .HasForeignKey(d => d.UserId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("FK_WorkloadMetric_User");
+        });
+        
+        // 7. AssignmentHistory Entity
+        modelBuilder.Entity<AssignmentHistory>(entity =>
+        {
+            entity.ToTable("assignment_history");
+            
+            entity.HasKey(e => e.AssignmentHistoryId);
+            
+            entity.Property(e => e.AssignmentHistoryId).HasColumnName("assignmentHistoryId");
+            entity.Property(e => e.TaskId).HasColumnName("taskId");
+            entity.Property(e => e.AssignedToUserId).HasColumnName("assignedToUserId");
+            entity.Property(e => e.AssignedByUserId).HasColumnName("assignedByUserId");
+            
+            entity.Property(e => e.AssignmentMethod)
+                .HasMaxLength(20)
+                .HasDefaultValue("Manual")
+                .HasColumnName("assignmentMethod");
+            
+            entity.Property(e => e.MatchScore)
+                .HasColumnType("decimal(5,4)")
+                .HasColumnName("matchScore");
+            
+            entity.Property(e => e.ClusterIdUsed)
+                .HasColumnName("clusterIdUsed");
+            
+            entity.Property(e => e.AssignmentReason)
+                .HasColumnName("assignmentReason");
+            
+            entity.Property(e => e.AssignedAt)
+                .HasDefaultValueSql("(getdate())")
+                .HasColumnType("datetime")
+                .HasColumnName("assignedAt");
+            
+            entity.Property(e => e.IsCompleted)
+                .HasColumnName("isCompleted");
+            
+            entity.Property(e => e.CompletedOnTime)
+                .HasColumnName("completedOnTime");
+            
+            entity.Property(e => e.CompletedAt)
+                .HasColumnType("datetime")
+                .HasColumnName("completedAt");
+            
+            // Relationships
+            entity.HasOne(d => d.Task)
+                .WithMany(p => p.AssignmentHistories)
+                .HasForeignKey(d => d.TaskId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("FK_AssignmentHistory_Task");
+            
+            entity.HasOne(d => d.AssignedToUser)
+                .WithMany(p => p.AssignmentsReceived)
+                .HasForeignKey(d => d.AssignedToUserId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_AssignmentHistory_AssignedTo");
+            
+            entity.HasOne(d => d.AssignedByUser)
+                .WithMany(p => p.AssignmentsGiven)
+                .HasForeignKey(d => d.AssignedByUserId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_AssignmentHistory_AssignedBy");
+        });
+        
+        // 8. PerformanceReview Entity
+        modelBuilder.Entity<PerformanceReview>(entity =>
+        {
+            entity.ToTable("performance_review");
+            
+            entity.HasKey(e => e.PerformanceReviewId);
+            
+            entity.Property(e => e.PerformanceReviewId).HasColumnName("performanceReviewId");
+            entity.Property(e => e.UserId).HasColumnName("userId");
+            entity.Property(e => e.ReviewedByUserId).HasColumnName("reviewedByUserId");
+            
+            entity.Property(e => e.ReviewPeriod)
+                .IsRequired()
+                .HasMaxLength(50)
+                .HasColumnName("reviewPeriod");
+            
+            entity.Property(e => e.OverallRating)
+                .HasColumnType("decimal(3,2)")
+                .HasColumnName("overallRating");
+            
+            entity.Property(e => e.TechnicalSkillsRating)
+                .HasColumnType("decimal(3,2)")
+                .HasColumnName("technicalSkillsRating");
+            
+            entity.Property(e => e.TeamworkRating)
+                .HasColumnType("decimal(3,2)")
+                .HasColumnName("teamworkRating");
+            
+            entity.Property(e => e.TimelinessRating)
+                .HasColumnType("decimal(3,2)")
+                .HasColumnName("timelinessRating");
+            
+            entity.Property(e => e.Comments)
+                .HasColumnName("comments");
+            
+            entity.Property(e => e.ReviewDate)
+                .HasDefaultValueSql("(getdate())")
+                .HasColumnType("datetime")
+                .HasColumnName("reviewDate");
+            
+            // Relationships
+            entity.HasOne(d => d.User)
+                .WithMany(p => p.PerformanceReviews)
+                .HasForeignKey(d => d.UserId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("FK_PerformanceReview_User");
+            
+            entity.HasOne(d => d.ReviewedBy)
+                .WithMany(p => p.PerformanceReviewsGiven)
+                .HasForeignKey(d => d.ReviewedByUserId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_PerformanceReview_ReviewedBy");
+        });
+
         OnModelCreatingPartial(modelBuilder);
     }
 
     partial void OnModelCreatingPartial(ModelBuilder modelBuilder);
 }
+

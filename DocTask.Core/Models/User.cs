@@ -66,4 +66,22 @@ public partial class User
     public virtual ICollection<Userrole> Userroles { get; set; } = new List<Userrole>();
 
     public virtual ICollection<Task> TasksNavigation { get; set; } = new List<Task>();
+    
+    // Navigation properties mới cho K-means và AI features
+    public virtual EmployeeProfile? EmployeeProfile { get; set; }
+    
+    public virtual EmployeeCluster? EmployeeCluster { get; set; }
+    
+    public virtual ICollection<UserSkill> UserSkills { get; set; } = new List<UserSkill>();
+    
+    public virtual ICollection<WorkloadMetric> WorkloadMetrics { get; set; } = new List<WorkloadMetric>();
+    
+    public virtual ICollection<AssignmentHistory> AssignmentsReceived { get; set; } = new List<AssignmentHistory>();
+    
+    public virtual ICollection<AssignmentHistory> AssignmentsGiven { get; set; } = new List<AssignmentHistory>();
+    
+    public virtual ICollection<PerformanceReview> PerformanceReviews { get; set; } = new List<PerformanceReview>();
+    
+    public virtual ICollection<PerformanceReview> PerformanceReviewsGiven { get; set; } = new List<PerformanceReview>();
 }
+
