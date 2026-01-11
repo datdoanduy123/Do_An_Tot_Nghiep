@@ -705,7 +705,7 @@ public partial class ApplicationDbContext : DbContext
             entity.HasOne(d => d.User)
                 .WithMany(p => p.UserSkills)
                 .HasForeignKey(d => d.UserId)
-                .OnDelete(DeleteBehavior.Cascade)
+                .OnDelete(DeleteBehavior.Restrict)  // Thay đổi từ Cascade → Restrict
                 .HasConstraintName("FK_UserSkill_User");
             
             entity.HasOne(d => d.Skill)
@@ -719,6 +719,7 @@ public partial class ApplicationDbContext : DbContext
                 .HasForeignKey(d => d.VerifiedBy)
                 .OnDelete(DeleteBehavior.SetNull)
                 .HasConstraintName("FK_UserSkill_Verifier");
+
         });
         
         // 3. TaskSkillRequirement Entity
@@ -818,7 +819,7 @@ public partial class ApplicationDbContext : DbContext
             entity.HasOne(d => d.User)
                 .WithOne(p => p.EmployeeProfile)
                 .HasForeignKey<EmployeeProfile>(d => d.UserId)
-                .OnDelete(DeleteBehavior.Cascade)
+                .OnDelete(DeleteBehavior.Restrict)  // Thay đổi từ Cascade → Restrict
                 .HasConstraintName("FK_EmployeeProfile_User");
         });
         
@@ -864,7 +865,7 @@ public partial class ApplicationDbContext : DbContext
             entity.HasOne(d => d.User)
                 .WithOne(p => p.EmployeeCluster)
                 .HasForeignKey<EmployeeCluster>(d => d.UserId)
-                .OnDelete(DeleteBehavior.Cascade)
+                .OnDelete(DeleteBehavior.Restrict)  // Thay đổi từ Cascade → Restrict
                 .HasConstraintName("FK_EmployeeCluster_User");
         });
         
@@ -902,8 +903,9 @@ public partial class ApplicationDbContext : DbContext
             entity.HasOne(d => d.User)
                 .WithMany(p => p.WorkloadMetrics)
                 .HasForeignKey(d => d.UserId)
-                .OnDelete(DeleteBehavior.Cascade)
+                .OnDelete(DeleteBehavior.Restrict)  // Thay đổi từ Cascade → Restrict
                 .HasConstraintName("FK_WorkloadMetric_User");
+
         });
         
         // 7. AssignmentHistory Entity
