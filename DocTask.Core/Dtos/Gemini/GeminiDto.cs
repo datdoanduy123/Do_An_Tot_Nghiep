@@ -15,12 +15,21 @@ namespace DocTask.Core.Dtos.Gemini
             public string CacheKey { get; set; } = "";
         }
 
+        public class GeminiSkillRequirementDTO
+        {
+            public string SkillName { get; set; } = "";
+            public int RequiredLevel { get; set; } = 3;
+            public int Importance { get; set; } = 2;
+        }
+
         public class GeminiTaskDto
         {
             public string Title { get; set; } = "";
             public string Description { get; set; } = "";
             public DateTime StartDate { get; set; }
             public DateTime EndDate { get; set; }
+            public decimal? EstimatedHours { get; set; }
+            public List<GeminiSkillRequirementDTO> RequiredSkills { get; set; } = new();    
             public List<GeminiSubtaskDto> Subtasks { get; set; } = new();
         }
 
@@ -30,6 +39,8 @@ namespace DocTask.Core.Dtos.Gemini
             public string Description { get; set; } = "";
             public DateTime StartDate { get; set; }
             public DateTime DueDate { get; set; }
+            public decimal? EstimatedHours { get; set; }
+            public List<GeminiSkillRequirementDTO> RequiredSkills { get; set; } = new();
             public string Frequency { get; set; } = "daily"; // daily/weekly/monthly
             public List<int> AssignedUserIds { get; set; } = new();
             public List<int> AssignedUnitIds { get; set; } = new();
@@ -255,36 +266,95 @@ namespace DocTask.Core.Dtos.Gemini
                     ",
 
                     PromptContextType.GenerateTasks => @"
-                    Trích xuất tất cả các công việc từ nội dung văn bản. 
-                    Lấy tiêu đề của tài liệu làm tên việc cha, và các công việc trong đó là việc con
-                    - Mỗi công việc, kể cả việc cha hay việc con, đều bao gồm các thông tin sau: 
-                        + Tên công việc
-                        + Mô tả công việc
-                            * Chi tiết mô tả
-                        + Ngày bắt đầu
-                        + Ngày kết thúc (deadline)
+                    Trích xuất tất cả các công việc từ nội dung văn bản.
+                    Lấy tiêu đề của tài liệu làm tên việc cha, và các công việc trong đó là việc con.
+                    **Mỗi công việc (cả việc cha và việc con) đều BẮT BUỘC phải có:**
+                
+                    1. **Thông tin cơ bản:**
+                        - title: Tên công việc
+                        - description: Mô tả chi tiết công việc
+                        - startDate: Ngày bắt đầu (dd/MM/yyyy)
+                        - endDate/dueDate: Ngày kết thúc (dd/MM/yyyy)
+                    2. **Ước tính giờ (estimatedHours):** ⭐ QUAN TRỌNG
+                        - Phân tích độ phức tạp của công việc
+                        - Ước tính số giờ cần thiết (VD: 8, 16, 40, 80...)
+                        - Nếu không rõ → ước tính dựa trên mô tả:
+                            * Công việc đơn giản: 8-16 giờ
+                            * Công việc trung bình: 24-40 giờ
+                            * Công việc phức tạp: 60-120 giờ
+                    3. **Kỹ năng cần thiết (requiredSkills):** ⭐ CỰC KỲ QUAN TRỌNG
+                        - Phân tích mô tả công việc để extract skills
+                        - Mỗi skill gồm 3 thông tin:
+                            * skillName: Tên kỹ năng (VD: 'C# .NET', 'React', 'SQL Server', 'Docker', 'UI/UX Design')
+                            * requiredLevel: Mức độ yêu cầu (1-5)
+                                1 = Beginner (Mới học)
+                                2 = Elementary (Cơ bản)
+                                3 = Intermediate (Trung bình)
+                                4 = Advanced (Nâng cao)
+                                5 = Expert (Chuyên gia)
+                            * importance: Độ quan trọng (1-3)
+                                1 = Nice to have (Tốt nếu có)
+                                2 = Important (Quan trọng)
+                                3 = Critical (Bắt buộc phải có)
+                    **Hướng dẫn extract skills:**
+                    - VD 1: 'Xây dựng API với C#' 
+                    → [{""skillName"": ""C# .NET"", ""requiredLevel"": 4, ""importance"": 3}]
+                    
+                    - VD 2: 'Thiết kế giao diện web responsive' 
+                    → [{""skillName"": ""UI/UX Design"", ""requiredLevel"": 3, ""importance"": 3}, 
+                        {""skillName"": ""HTML/CSS"", ""requiredLevel"": 3, ""importance"": 2}]
+                    
+                    - VD 3: 'Quản lý database SQL Server' 
+                    → [{""skillName"": ""SQL Server"", ""requiredLevel"": 4, ""importance"": 3}]
+                    
+                    - Nếu mô tả chỉ chung chung → requiredLevel = 3, importance = 2
+                    **Quy tắc về dates:**
                     - Nếu văn bản KHÔNG có ngày bắt đầu → dùng ngày hiện tại ({DateTime.Now:dd/MM/yyyy})
                     - Nếu văn bản KHÔNG có ngày kết thúc → lấy sau 45 ngày ({DateTime.Now.AddDays(45):dd/MM/yyyy})
-                    - Mọi task cần phải có startDate, endDate
-                    Trả theo cấu trúc JSON như sau:
-
+                    - Mọi task BẮT BUỘC phải có startDate và endDate
+                    **Trả về theo cấu trúc JSON SAU (CHÍNH XÁC):**
                     {
                         ""title"": ""[Tên dự án]"",
                         ""description"": ""[Mô tả dự án cha]"",
-                        ""startDate"": ""[dd/MM/yyyy]"",
-                        ""endDate"": ""[dd/MM/yyyy]"",
+                        ""startDate"": ""dd/MM/yyyy"",
+                        ""endDate"": ""dd/MM/yyyy"",
+                        ""estimatedHours"": 120,
+                        ""requiredSkills"": [
+                            {
+                                ""skillName"": ""C# .NET"",
+                                ""requiredLevel"": 4,
+                                ""importance"": 3
+                            },
+                            {
+                                ""skillName"": ""SQL Server"",
+                                ""requiredLevel"": 3,
+                                ""importance"": 2
+                            }
+                        ],
                         ""subtasks"": [
                             {
-                            ""title"": ""[Tên công việc]"",
-                            ""description"": ""[Mô tả chi tiết]"",
-                            ""startDate"": ""[dd/MM/yyyy]"",
-                            ""dueDate"": ""[dd/MM/yyyy]"",
+                                ""title"": ""[Tên công việc con]"",
+                                ""description"": ""[Mô tả chi tiết]"",
+                                ""startDate"": ""dd/MM/yyyy"",
+                                ""dueDate"": ""dd/MM/yyyy"",
+                                ""estimatedHours"": 40,
+                                ""requiredSkills"": [
+                                    {
+                                        ""skillName"": ""[Kỹ năng]"",
+                                        ""requiredLevel"": 3,
+                                        ""importance"": 2
+                                    }
+                                ]
                             }
                         ]
                     }
-                    
-                    
+                    **LƯU Ý QUAN TRỌNG:**
+                    - LUÔN LUÔN bao gồm estimatedHours (ước tính hợp lý)
+                    - LUÔN LUÔN bao gồm requiredSkills (ít nhất 1 skill cho mỗi task)
+                    - requiredSkills phải dựa trên mô tả công việc, KHÔNG bịa đặt
+                    - Nếu không chắc chắn về skill → dùng level 3, importance 2
                     ",
+
                     _ => "Trả lời tự nhiên, dễ hiểu",
                 };
             }
