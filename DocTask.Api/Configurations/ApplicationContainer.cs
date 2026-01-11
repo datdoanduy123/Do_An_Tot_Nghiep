@@ -22,7 +22,6 @@ namespace DockTask.Api.Configurations
             services.AddScoped<IUploadFileService, UploadFileService>();
             services.AddScoped<ISubTaskService, SubTaskService>();
             services.AddScoped<IGeminiService, GeminiService>();
-            services.AddScoped<IOpenAIService, OpenAIService>();
             services.AddScoped<IUnitService, UnitService>();
             services.AddTransient<IFileConvertService, FileConvertService>();
             services.AddSingleton<IUserIdProvider, CustomUserIdProvider>();

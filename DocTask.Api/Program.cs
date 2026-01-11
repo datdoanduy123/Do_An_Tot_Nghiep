@@ -10,7 +10,6 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
-using OpenAI;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using DocTask.Core.Models;
 
@@ -93,11 +92,6 @@ builder.Services.AddSingleton<IAmazonS3>(sp =>
         }
     );
 });
-
-// Configuration OpenAI
-builder.Services.AddSingleton(new OpenAIClient( 
-    Environment.GetEnvironmentVariable("OPENAI_API_KEY")
-));
 
 // Configuration GeminiAI
 builder.Services.AddSingleton(new GeminiDto.GeminiOptions
