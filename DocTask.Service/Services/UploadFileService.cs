@@ -9,262 +9,218 @@ using DocTask.Core.Models;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http.HttpResults;
 using DocTask.Core.Paginations;
-using Amazon.S3;
+using CloudinaryDotNet;
+using CloudinaryDotNet.Actions;
 using Microsoft.Extensions.Options;
-using Amazon.S3.Model;
-using System.Web;
+using DocTask.Core.Models;
 
 namespace DocTask.Service.Services
 {
+    /// <summary>
+    /// Service xử lý upload file lên Cloudinary
+    /// Hỗ trợ upload, download, lấy thông tin file và xóa file
+    /// </summary>
     public class UploadFileService : IUploadFileService
     {
+        private readonly Cloudinary _cloudinary;
+        private readonly CloudinarySettings _settings;
         private readonly IUploadFileRepository _uploadFileRepository;
-        private readonly IAmazonS3 _s3Client;
-        private readonly string _bucketName;
-        private readonly string _endpoint;
-
+        
         public UploadFileService(
-            IAmazonS3 s3Client,
-            IOptions<MinioSettings> settings,
+            Cloudinary cloudinary,
+            IOptions<CloudinarySettings> settings,
             IUploadFileRepository uploadFileRepository
         )
         {
-            _s3Client = s3Client ?? throw new ArgumentNullException(nameof(s3Client));
-            _bucketName = settings.Value.BucketName?.Trim().ToLower() ?? throw new ArgumentNullException("BucketName is null");
-            _uploadFileRepository = uploadFileRepository ?? throw new ArgumentNullException(nameof(uploadFileRepository));
-            _endpoint = settings.Value.ServiceURL?.TrimEnd('/') ?? "http://localhost:9000";
+            _cloudinary = cloudinary;
+            _settings = settings.Value;
+            _uploadFileRepository = uploadFileRepository;
         }
-
-        private string SanitizeKey(string fileName)
+        
+        /// <summary>
+        /// Upload file lên Cloudinary
+        /// </summary>
+        /// <param name="request">Request chứa file cần upload</param>
+        /// <param name="userId">ID của user upload (nullable)</param>
+        /// <returns>UploadFileDto chứa thông tin file đã upload</returns>
+        public async Task<UploadFileDto> UploadFileAsync(
+            UploadFileRequest request, 
+            int? userId
+        )
         {
-            // Thay dấu cách bằng _ và loại bỏ ký tự không hợp lệ
-            var safeName = fileName.Trim().Replace(" ", "_");
-            return safeName;
-        }
-
-        public async Task<UploadFileDto> UploadFileAsync(UploadFileRequest request, int? userId)
-        {
-            if (userId == null)
+            var file = request.File;
+            var fileName = $"{DateTime.UtcNow:yyyyMMdd_HHmmss}_{file.FileName}";
+            var publicId = $"{_settings.Folder}/{fileName}";
+            using var stream = file.OpenReadStream();
+            
+            // Upload lên Cloudinary - RawUploadParams hỗ trợ mọi loại file
+            var uploadParams = new RawUploadParams
             {
-                throw new ArgumentNullException(nameof(userId), "User ID cannot be null");
-            }
-
-            if (request.File == null || request.File.Length == 0)
-            {
-                throw new ArgumentException("No file provided");
-            }
-
-            const long maxFileSize = 10 * 1024 * 1024; // 10 MB
-            if (request.File.Length > maxFileSize)
-            {
-                throw new ArgumentException($"File size exceeds the maximum limit of {maxFileSize / (1024 * 1024)} MB");
-            }
-
-            // Kiểm tra định dạng file
-            List<string> validExtensions = new List<string>()
-            {
-                ".jpg", ".png", ".gif", // Image
-                ".pdf", ".txt",         // Documents
-                ".doc", ".docx",        // Word
-                ".xls", ".xlsx",        // Excel
+                File = new FileDescription(fileName, stream),
+                PublicId = publicId,
+                Folder = _settings.Folder,
+                UseFilename = true,
+                UniqueFilename = false,
+                Overwrite = false
             };
-
-            var fileExtension = Path.GetExtension(request.File.FileName).ToLowerInvariant();
-            if (!validExtensions.Contains(fileExtension))
+            
+            var uploadResult = await _cloudinary.UploadAsync(uploadParams);
+            if (uploadResult.Error != null)
             {
-                throw new ArgumentException($@"
-                    Extension is not valid({string.Join(',', validExtensions)})
-                    File Error: {request.File.FileName}
-                    ");
+                throw new Exception($"Cloudinary upload failed: {uploadResult.Error.Message}");
             }
-
-            // Name
-            // string timestamp = DateTime.UtcNow.ToString("yyyyMMdd_HHmmss");
-            // string cleanFileName = Path.GetFileNameWithoutExtension(request.File.FileName);
-            // string nameExtension = Path.GetExtension(request.File.FileName);
-            // var uniqueFileName = $"{cleanFileName}_user{userId}_at_{timestamp}{nameExtension}";
-
-            var uniqueFileName = $"{Guid.NewGuid()}_{SanitizeKey(request.File.FileName)}";
-
-            // Kiểm tra bucket tồn tại
-            var buckets = await _s3Client.ListBucketsAsync();
-            if (!buckets.Buckets.Any(b => b.BucketName == _bucketName))
-                throw new Exception($"Bucket '{_bucketName}' không tồn tại hoặc client không nhìn thấy!");
-
-            using var stream = request.File.OpenReadStream();
-            var putRequest = new PutObjectRequest
-            {
-                BucketName = _bucketName,
-                Key = uniqueFileName,
-                InputStream = stream,
-                ContentType = request.File.ContentType
-            };
-
-            await _s3Client.PutObjectAsync(putRequest);
-
+            
+            // Lưu vào database
             var uploadFile = new Uploadfile
             {
-                FileName = request.File.FileName,
-                FilePath = uniqueFileName, // chỉ lưu key an toàn
+                FileName = file.FileName,
+                FilePath = uploadResult.SecureUrl.ToString(), // Cloudinary URL
+                FileSize = file.Length,
+                ContentType = file.ContentType,
+                UploadedAt = DateTime.Now,
                 UploadedBy = userId,
-                UploadedAt = DateTime.UtcNow
+                PublicId = uploadResult.PublicId // Lưu PublicId để delete sau
             };
-
-            var savedFile = await _uploadFileRepository.CreateAsync(uploadFile);
-
-            return new UploadFileDto
-            {
-                FileId = savedFile.FileId,
-                FileName = savedFile.FileName,
-                FilePath = $"{_endpoint}/{_bucketName}/{HttpUtility.UrlEncode(savedFile.FilePath)}",
-                UploadedBy = savedFile.UploadedBy,
-                UploadedAt = savedFile.UploadedAt,
-                FileSize = request.File.Length,
-                ContentType = request.File.ContentType,
-            };
+            
+            await _uploadFileRepository.CreateAsync(uploadFile);
+            
+            // Map entity sang DTO
+            return MapToDto(uploadFile);
         }
-
+        
+        /// <summary>
+        /// Lấy thông tin file theo ID
+        /// </summary>
+        /// <param name="fileId">ID của file</param>
+        /// <returns>UploadFileDto hoặc null nếu không tìm thấy</returns>
         public async Task<UploadFileDto?> GetFileByIdAsync(int fileId)
         {
             var file = await _uploadFileRepository.GetByIdAsync(fileId);
             if (file == null)
-            {
                 return null;
-            }
-
-            var fileInfo = new FileInfo(file.FilePath);
-
-            return new UploadFileDto
-            {
-                FileId = file.FileId,
-                FileName = file.FileName,
-                FilePath = $"{_endpoint}/{_bucketName}/{HttpUtility.UrlEncode(file.FilePath)}",
-                UploadedBy = file.UploadedBy,
-                UploadedAt = file.UploadedAt,
-                FileSize = fileInfo.Exists ? fileInfo.Length : 0,
-                ContentType = GetContentType(file.FileName),
-            };
+            
+            return MapToDto(file);
         }
-
+        
+        /// <summary>
+        /// Lấy danh sách tất cả files của user
+        /// </summary>
+        /// <param name="userId">ID của user</param>
+        /// <returns>Danh sách UploadFileDto</returns>
         public async Task<List<UploadFileDto>> GetFileByUserIdAsync(int userId)
         {
             var files = await _uploadFileRepository.GetByUserAsync(userId);
-            if (files == null)
-            {
-                return null;
-            }
-
-            return files.Select(f =>
-            {
-                var fileInfo = new FileInfo(f.FilePath);
-
-                return new UploadFileDto
-                {
-                    FileId = f.FileId,
-                    FileName = f.FileName,
-                    FilePath = $"{_endpoint}/{_bucketName}/{HttpUtility.UrlEncode(f.FilePath)}",
-                    UploadedBy = f.UploadedBy,
-                    UploadedAt = f.UploadedAt,
-                    FileSize = fileInfo.Exists ? fileInfo.Length : 0,
-                    ContentType = GetContentType(f.FileName),
-                };
-            }).ToList();
+            return files.Select(MapToDto).ToList();
         }
-
-        public async Task<PaginatedList<UploadFileDto>> GetFileByUserIdPaginatedAsync(int userId, PageOptionsRequest pageOptions)
+        
+        /// <summary>
+        /// Lấy danh sách files của user có phân trang
+        /// </summary>
+        /// <param name="userId">ID của user</param>
+        /// <param name="pageOptions">Tùy chọn phân trang</param>
+        /// <returns>PaginatedList chứa UploadFileDto</returns>
+        public async Task<PaginatedList<UploadFileDto>> GetFileByUserIdPaginatedAsync(
+            int userId, 
+            PageOptionsRequest pageOptions
+        )
         {
-            var allFiles = await GetFileByUserIdAsync(userId);
-            var items = allFiles
-                .Skip((pageOptions.Page - 1) * pageOptions.Size)
-                .Take(pageOptions.Size)
-                .ToList();
-
+            var paginatedFiles = await _uploadFileRepository.GetByUserPaginatedAsync(userId, pageOptions);
+            
+            var dtos = paginatedFiles.Items.Select(MapToDto).ToList();
+            
             return new PaginatedList<UploadFileDto>(
-                items,
-                allFiles.Count,
-                pageOptions.Page,
-                pageOptions.Size
+                dtos,
+                paginatedFiles.MetaData.TotalItems,
+                paginatedFiles.MetaData.PageIndex,
+                pageOptions.Size > 0 ? pageOptions.Size : 10
             );
         }
-
+        
+        /// <summary>
+        /// Download file từ Cloudinary
+        /// </summary>
+        /// <param name="fileId">ID của file</param>
+        /// <returns>Stream của file hoặc null nếu không tìm thấy</returns>
         public async Task<Stream?> DownloadFileAsync(int fileId)
         {
             var file = await _uploadFileRepository.GetByIdAsync(fileId);
-            if (file == null || string.IsNullOrEmpty(file.FilePath))
-            {
-                throw new FileNotFoundException($"File not found.");
-            }
-
-            var getRequest = new GetObjectRequest
-            {
-                BucketName = _bucketName,
-                Key = file.FilePath,
-            };
-
-            var response = await _s3Client.GetObjectAsync(getRequest);
-            return response.ResponseStream;
+            if (file == null)
+                return null;
+            
+            // Download từ Cloudinary URL
+            using var httpClient = new HttpClient();
+            var response = await httpClient.GetAsync(file.FilePath);
+            
+            if (!response.IsSuccessStatusCode)
+                return null;
+            
+            return await response.Content.ReadAsStreamAsync();
         }
-
+        
+        /// <summary>
+        /// Lấy download link của file
+        /// </summary>
+        /// <param name="fileId">ID của file</param>
+        /// <returns>URL download hoặc null nếu không tìm thấy</returns>
         public async Task<string?> GetFileDownloadLinkAsync(int fileId)
         {
             var file = await _uploadFileRepository.GetByIdAsync(fileId);
             if (file == null)
-            {
-                throw new FileNotFoundException($"File not found.");
-            }
-                
-            var getRequest = new GetPreSignedUrlRequest
-            {
-                BucketName = _bucketName,
-                Key = file.FilePath,
-                Expires = DateTime.UtcNow.AddMinutes(15) // Link hợp lệ trong 15 phút
-            };
-
-            getRequest.ResponseHeaderOverrides.ContentDisposition = $"attachment; filename=\"{file.FileName}\"";
-
-            var url = _s3Client.GetPreSignedURL(getRequest);
-            return url;
+                return null;
+            
+            // Cloudinary URL là public URL, trả về trực tiếp
+            return file.FilePath;
         }
-
+        
+        /// <summary>
+        /// Xóa file khỏi Cloudinary và database
+        /// </summary>
+        /// <param name="fileId">ID của file cần xóa</param>
+        /// <param name="userId">ID của user thực hiện xóa (để kiểm tra quyền)</param>
+        /// <returns>true nếu xóa thành công, false nếu không tìm thấy file</returns>
         public async Task<bool> DeleteFileAsync(int fileId, int userId)
         {
             var file = await _uploadFileRepository.GetByIdAsync(fileId);
             if (file == null)
-            {
                 return false;
-            }
-
-            var deleteRequest = new DeleteObjectRequest
-            {   
-                BucketName = _bucketName,
-                Key = file.FilePath
-            };
-
-            var response = await _s3Client.DeleteObjectAsync(deleteRequest);
-            if (response.HttpStatusCode == System.Net.HttpStatusCode.NoContent)
+            
+            // Kiểm tra quyền: chỉ user đã upload mới được xóa
+            if (file.UploadedBy.HasValue && file.UploadedBy.Value != userId)
             {
-                await _uploadFileRepository.DeleteAsync(fileId);
-                return true;
+                throw new UnauthorizedAccessException("Bạn không có quyền xóa file này");
             }
-
-            return false;
+            
+            // Delete từ Cloudinary
+            if (!string.IsNullOrEmpty(file.PublicId))
+            {
+                var deleteParams = new DeletionParams(file.PublicId);
+                var result = await _cloudinary.DestroyAsync(deleteParams);
+                
+                if (result.Error != null)
+                {
+                    throw new Exception($"Cloudinary delete failed: {result.Error.Message}");
+                }
+            }
+            
+            // Delete từ database
+            await _uploadFileRepository.DeleteAsync(fileId);
+            return true;
         }
-
-        private static string GetContentType(string fileName)
+        
+        /// <summary>
+        /// Map entity Uploadfile sang DTO
+        /// </summary>
+        private UploadFileDto MapToDto(Uploadfile file)
         {
-            var extension = Path.GetExtension(fileName).ToLowerInvariant();
-            return extension switch
+            return new UploadFileDto
             {
-                ".pdf" => "application/pdf",
-                ".doc" => "application/msword",
-                ".docx" => "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                ".xls" => "application/vnd.ms-excel",
-                ".xlsx" => "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                ".jpg" or ".jpeg" => "image/jpeg",
-                ".png" => "image/png",
-                ".gif" => "image/gif",
-                ".txt" => "text/plain",
-                _ => "application/octet-stream",
+                FileId = file.FileId,
+                FileName = file.FileName,
+                FilePath = file.FilePath,
+                FileSize = file.FileSize,
+                ContentType = file.ContentType,
+                UploadedAt = file.UploadedAt,
+                UploadedBy = file.UploadedBy
             };
         }
     }

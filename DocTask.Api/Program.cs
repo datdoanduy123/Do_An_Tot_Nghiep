@@ -1,6 +1,7 @@
 using System.Text;
-using Amazon.S3;
+using CloudinaryDotNet;
 using DockTask.Api.Configurations;
+using DocTask.Core.Models;
 using DockTask.Api.Handlers;
 using DocTask.Core.Dtos.Gemini;
 using DocTask.Data;
@@ -53,18 +54,17 @@ builder.Services.Configure<JwtSetting>(options =>
     options.Audience = Environment.GetEnvironmentVariable("JWT_AUDIENCE") ?? "";
 });
 
-// --- Bind Minio settings ---
-builder.Services.Configure<MinioSettings>(options =>
+// --- Cấu hình Cloudinary settings ---
+builder.Services.Configure<CloudinarySettings>(options =>
 {
-    options.ServiceURL = Environment.GetEnvironmentVariable("MINIO_SERVICE_URL") ?? "";
-    options.BucketName = Environment.GetEnvironmentVariable("MINIO_BUCKETNAME") ?? "";
-    options.AccessKey = Environment.GetEnvironmentVariable("MINIO_ACCESS_KEY") ?? "";
-    options.SecretKey = Environment.GetEnvironmentVariable("MINIO_SECRET_KEY") ?? "";
+    options.CloudName = Environment.GetEnvironmentVariable("CLOUDINARY_CLOUDNAME") ?? "";
+    options.ApiKey = Environment.GetEnvironmentVariable("CLOUDINARY_API_KEY") ?? "";
+    options.ApiSecret = Environment.GetEnvironmentVariable("CLOUDINARY_API_SECRET") ?? "";
+    options.Folder = Environment.GetEnvironmentVariable("CLOUDINARY_FOLDER") ?? "doctask";
 });
-Console.WriteLine($"MINIO_SERVICE_URL = {Environment.GetEnvironmentVariable("MINIO_SERVICE_URL")}");
-Console.WriteLine($"MINIO_BUCKETNAME = {Environment.GetEnvironmentVariable("MINIO_BUCKETNAME")}");
-Console.WriteLine($"MINIO_ACCESS_KEY  = {Environment.GetEnvironmentVariable("MINIO_ACCESS_KEY")}");
-Console.WriteLine($"MINIO_SECRET_KEY  = {Environment.GetEnvironmentVariable("MINIO_SECRET_KEY")}");
+Console.WriteLine($"CLOUDINARY_CLOUDNAME = {Environment.GetEnvironmentVariable("CLOUDINARY_CLOUDNAME")}");
+Console.WriteLine($"CLOUDINARY_API_KEY   = {Environment.GetEnvironmentVariable("CLOUDINARY_API_KEY")}");
+Console.WriteLine($"CLOUDINARY_FOLDER    = {Environment.GetEnvironmentVariable("CLOUDINARY_FOLDER")}");
 
 // Đăng ký SMTP settings từ environment
 builder.Services.Configure<SmtpSettings>(options =>
@@ -78,19 +78,18 @@ builder.Services.Configure<SmtpSettings>(options =>
     options.EnableSsl = bool.Parse(Environment.GetEnvironmentVariable("SMTP_ENABLE_SSL") ?? "true");
 });
 
-builder.Services.AddSingleton<IAmazonS3>(sp =>
+// Đăng ký Cloudinary instance
+builder.Services.AddSingleton<Cloudinary>(sp =>
 {
-    var settings = sp.GetRequiredService<IOptions<MinioSettings>>().Value;
-
-    return new AmazonS3Client(
-        settings.AccessKey,
-        settings.SecretKey,
-        new AmazonS3Config
-        {
-            ServiceURL = settings.ServiceURL,
-            ForcePathStyle = true
-        }
+    var settings = sp.GetRequiredService<IOptions<CloudinarySettings>>().Value;
+    
+    var account = new Account(
+        settings.CloudName,
+        settings.ApiKey,
+        settings.ApiSecret
     );
+    
+    return new Cloudinary(account);
 });
 
 // Configuration GeminiAI
@@ -180,18 +179,11 @@ using (var scope = builder.Services.BuildServiceProvider().CreateScope())
 
 var app = builder.Build();
 
-// ép container resolve IAmazonS3 ngay khi khởi động
+// Kiểm tra Cloudinary đã được khởi tạo thành công
 using (var scope = app.Services.CreateScope())
 {
-    var s3 = scope.ServiceProvider.GetRequiredService<IAmazonS3>();
-    Console.WriteLine("IAmazonS3 client initialized successfully!");
-}
-
-var minioSection = builder.Configuration.GetSection("Minio");
-Console.WriteLine("[DEBUG] Minio from appsettings:");
-foreach (var kv in minioSection.GetChildren())
-{
-    Console.WriteLine($"    {kv.Key} = {kv.Value}");
+    var cloudinary = scope.ServiceProvider.GetRequiredService<Cloudinary>();
+    Console.WriteLine("Cloudinary client initialized successfully!");
 }
 
 if (app.Environment.IsDevelopment())
