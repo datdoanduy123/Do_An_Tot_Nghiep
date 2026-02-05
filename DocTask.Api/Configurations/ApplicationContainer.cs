@@ -27,7 +27,10 @@ namespace DockTask.Api.Configurations
             services.AddSingleton<IUserIdProvider, CustomUserIdProvider>();
             services.AddScoped<IEmailService, EmailService>();
             services.AddScoped<IAutomationService, AutomationService>();
-        
+            services.AddScoped<IEmployeeClusteringService, EmployeeClusteringService>();
+            // Repositories section
+            services.AddScoped<IEmployeeProfileRepository, EmployeeProfileRepository>();
+            services.AddScoped<IEmployeeClusterRepository, EmployeeClusterRepository>();
             // Repositories
             services.AddScoped<ITaskRepository, TaskRepository>();
             services.AddScoped<IProgressRepository, ProgressRepository>();
