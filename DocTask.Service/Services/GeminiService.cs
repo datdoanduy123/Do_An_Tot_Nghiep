@@ -329,28 +329,26 @@ namespace DocTask.Service.Services
                 },
                 generationConfig = new
                 {
-                    temperature = 0.75,
-                    candidateCount = 3,
+                    temperature = temperature,
+                    candidateCount = 1,
                     topP = 0.8,
                     topK = 40,
                     maxOutputTokens = 4096,
                 }
             };
 
-            var url = $"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={_geminiApiKey}";
+            var url = $"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={_geminiApiKey}";
 
-            var httpResponse = await _httpClient.PostAsJsonAsync(url, requestBody);
-            var raw = await httpResponse.Content.ReadAsStringAsync();
-
-            int maxRetries = 3;
-            int delayMs = 2500;
+            // Retry logic với xử lý 429 và 503
+            int maxRetries = 5;
+            int delayMs = 2000;
             string? rawResponse = null;
 
             for (int i = 0; i < maxRetries; i++)
             {
                 try
                 {
-                    using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30)); // Timeout mỗi request 30s
+                    using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(60)); // Timeout 60s
 
                     var request = new HttpRequestMessage(HttpMethod.Post, url)
                     {
@@ -362,36 +360,59 @@ namespace DocTask.Service.Services
                     var response = await _httpClient.SendAsync(request, cts.Token);
                     rawResponse = await response.Content.ReadAsStringAsync();
 
+                    // Xử lý lỗi 429 - Too Many Requests (Rate Limit)
+                    if (response.StatusCode == (HttpStatusCode)429)
+                    {
+                        Console.WriteLine($"⚠️ Gemini API Rate Limit (429) - lần {i + 1}/{maxRetries}");
+                        Console.WriteLine($"   Chờ {delayMs}ms trước khi thử lại...");
+                        await System.Threading.Tasks.Task.Delay(delayMs);
+                        delayMs *= 2; // Exponential backoff: 2s → 4s → 8s → 16s → 32s
+                        continue;
+                    }
+
+                    // Xử lý lỗi 503 - Service Unavailable
                     if (response.StatusCode == HttpStatusCode.ServiceUnavailable)
                     {
-                        Console.WriteLine($"Gemini bị 503 (lần {i + 1}/{maxRetries}). Thử lại sau {delayMs}ms...");
+                        Console.WriteLine($"⚠️ Gemini bị 503 (lần {i + 1}/{maxRetries}). Thử lại sau {delayMs}ms...");
                         await System.Threading.Tasks.Task.Delay(delayMs);
                         delayMs *= 2;
                         continue;
                     }
 
+                    // Thành công - thoát khỏi vòng lặp
                     response.EnsureSuccessStatusCode();
                     break;
                 }
                 catch (HttpRequestException ex)
                 {
-                    Console.WriteLine($" Lỗi mạng khi gọi Gemini: {ex.Message}");
-                    if (i == maxRetries - 1) throw;
+                    Console.WriteLine($"❌ Lỗi mạng khi gọi Gemini: {ex.Message}");
+                    if (i == maxRetries - 1) 
+                    {
+                        throw new Exception($"Không thể kết nối Gemini API sau {maxRetries} lần thử: {ex.Message}", ex);
+                    }
+                    await System.Threading.Tasks.Task.Delay(delayMs);
+                    delayMs *= 2;
+                }
+                catch (TaskCanceledException)
+                {
+                    Console.WriteLine($"⏱️ Request timeout (lần {i + 1}/{maxRetries})");
+                    if (i == maxRetries - 1)
+                    {
+                        throw new Exception($"Gemini API timeout sau {maxRetries} lần thử");
+                    }
                     await System.Threading.Tasks.Task.Delay(delayMs);
                     delayMs *= 2;
                 }
             }
 
             if (string.IsNullOrWhiteSpace(rawResponse))
-                return "Không nhận được phản hồi từ Gemini.";
-
+                throw new Exception("Không nhận được phản hồi từ Gemini API sau nhiều lần thử.");
 
             Console.WriteLine("==== RAW Gemini ====");
-            Console.WriteLine(raw);
+            Console.WriteLine(rawResponse);
 
-            httpResponse.EnsureSuccessStatusCode();
-
-            using var doc = JsonDocument.Parse(raw);
+            // Parse response
+            using var doc = JsonDocument.Parse(rawResponse);
             var text = doc.RootElement
                 .GetProperty("candidates")[0]
                 .GetProperty("content")
@@ -514,30 +535,51 @@ namespace DocTask.Service.Services
         {
             if (chunkResponses.Count == 0) return new { subtasks = Array.Empty<object>() };
 
-            // Lấy title và description từ chunk đầu tiên
+            // Lấy title và description từ chunk đầu tiên (với safe access)
             var firstChunk = chunkResponses[0];
-            string title = firstChunk.GetProperty("title").GetString() ?? "";
-            string description = firstChunk.GetProperty("description").GetString() ?? "";
+            string title = firstChunk.TryGetProperty("title", out var titleProp) 
+                ? (titleProp.GetString() ?? "Untitled Task") 
+                : "Untitled Task";
+            string description = firstChunk.TryGetProperty("description", out var descProp) 
+                ? (descProp.GetString() ?? "") 
+                : "";
 
             var mergedSubtasks = new List<JsonElement>();
             DateTime? startDate = null;
             DateTime? endDate = null;
+            decimal? estimatedHours = null;
+            var mergedSkills = new List<JsonElement>();
 
             foreach (var chunk in chunkResponses)
             {
+                // Merge subtasks
                 if (chunk.TryGetProperty("subtasks", out var subtasks) && subtasks.ValueKind == JsonValueKind.Array)
                 {
                     mergedSubtasks.AddRange(subtasks.EnumerateArray());
                 }
 
+                // Lấy startDate sớm nhất
                 if (chunk.TryGetProperty("startDate", out var s) && DateTime.TryParse(s.GetString(), out var sd))
                 {
                     startDate = startDate == null || sd < startDate ? sd : startDate;
                 }
 
+                // Lấy endDate muộn nhất
                 if (chunk.TryGetProperty("endDate", out var e) && DateTime.TryParse(e.GetString(), out var ed))
                 {
                     endDate = endDate == null || ed > endDate ? ed : endDate;
+                }
+
+                // Merge estimatedHours (tính tổng)
+                if (chunk.TryGetProperty("estimatedHours", out var hours) && hours.ValueKind == JsonValueKind.Number)
+                {
+                    estimatedHours = (estimatedHours ?? 0) + hours.GetDecimal();
+                }
+
+                // Merge requiredSkills
+                if (chunk.TryGetProperty("requiredSkills", out var skills) && skills.ValueKind == JsonValueKind.Array)
+                {
+                    mergedSkills.AddRange(skills.EnumerateArray());
                 }
             }
 
@@ -545,8 +587,10 @@ namespace DocTask.Service.Services
             {
                 title,
                 description,
-                startDate = startDate?.ToString("dd/MM/yyyy") ?? "",
-                endDate = endDate?.ToString("dd/MM/yyyy") ?? "",
+                startDate = startDate?.ToString("dd/MM/yyyy") ?? DateTime.Now.ToString("dd/MM/yyyy"),
+                endDate = endDate?.ToString("dd/MM/yyyy") ?? DateTime.Now.AddDays(45).ToString("dd/MM/yyyy"),
+                estimatedHours = estimatedHours ?? 0,
+                requiredSkills = mergedSkills,
                 subtasks = mergedSubtasks
             };
         }
