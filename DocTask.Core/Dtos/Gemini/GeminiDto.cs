@@ -268,6 +268,24 @@ namespace DocTask.Core.Dtos.Gemini
                     PromptContextType.GenerateTasks => @"
                     Trích xuất tất cả các công việc từ nội dung văn bản.
                     Lấy tiêu đề của tài liệu làm tên việc cha, và các công việc trong đó là việc con.
+                    
+                    **⚠️ QUY TẮC ƯU TIÊN EXTRACT:**
+                    1. **LUÔN ƯU TIÊN** các công việc thực hiện/phát triển dự án (development, implementation, design, testing, deployment)
+                    2. **TUYỆT ĐỐI BỎ QUA** các công việc quản lý/báo cáo (reporting, meeting, planning) TRỪ KHI đó là mục đích chính của tài liệu
+                    3. Nếu tài liệu có cả 'CÔNG VIỆC CHI TIẾT' và 'TIẾN ĐỘ BÁO CÁO' → CHỈ LẤY phần 'CÔNG VIỆC CHI TIẾT'
+                    4. **TUYỆT ĐỐI KHÔNG** tạo subtask từ mục 'RỦI RO' hoặc 'GIẢI PHÁP' - đây chỉ là metadata, không phải công việc thực thi
+                    
+                    **⚠️ QUY TẮC NGÀY THÁNG:**
+                    - **TASK CHA (dự án tổng):**
+                        * Nếu văn bản có 'Thời gian thực hiện' / 'Timeline' / 'Duration' / 'Thời gian dự án'
+                        → **BẮT BUỘC** dùng làm startDate & endDate của task cha
+                        * VD: 'Thời gian: 15/02/2026 - 30/04/2026' → startDate='15/02/2026', endDate='30/04/2026'
+                        * **KHÔNG** dùng DateTime.Now cho task cha nếu đã có timeline tổng
+                    - **SUBTASKS:**
+                        * Ưu tiên lấy từ văn bản
+                        * Nếu không có → dùng ngày hiện tại ({DateTime.Now:dd/MM/yyyy})
+                    - **LUÔN kiểm tra:** startDate <= endDate (KHÔNG được đảo ngược!)
+                    
                     **Mỗi công việc (cả việc cha và việc con) đều BẮT BUỘC phải có:**
                 
                     1. **Thông tin cơ bản:**
@@ -278,12 +296,18 @@ namespace DocTask.Core.Dtos.Gemini
                     2. **Ước tính giờ (estimatedHours):** ⭐ QUAN TRỌNG
                         - Phân tích độ phức tạp của công việc
                         - Ước tính số giờ cần thiết (VD: 8, 16, 40, 80...)
+                        - **TASK CHA:** estimatedHours = TỔNG estimatedHours của tất cả subtasks
+                        - **KHÔNG** tự cộng thêm buffer hoặc thay đổi tổng nếu không có trong văn bản
                         - Nếu không rõ → ước tính dựa trên mô tả:
                             * Công việc đơn giản: 8-16 giờ
                             * Công việc trung bình: 24-40 giờ
                             * Công việc phức tạp: 60-120 giờ
                     3. **Kỹ năng cần thiết (requiredSkills):** ⭐ CỰC KỲ QUAN TRỌNG
                         - Phân tích mô tả công việc để extract skills
+                        - **KHÔNG được trùng skillName** - nếu trùng:
+                            * Lấy requiredLevel CAO NHẤT
+                            * Lấy importance CAO NHẤT
+                            * CHỈ GIỮ 1 skill entry
                         - Mỗi skill gồm 3 thông tin:
                             * skillName: Tên kỹ năng (VD: 'C# .NET', 'React', 'SQL Server', 'Docker', 'UI/UX Design')
                             * requiredLevel: Mức độ yêu cầu (1-5)

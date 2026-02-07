@@ -333,11 +333,11 @@ namespace DocTask.Service.Services
                     candidateCount = 1,
                     topP = 0.8,
                     topK = 40,
-                    maxOutputTokens = 4096,
+                    maxOutputTokens = 8192, // Tăng từ 4096 để tránh truncate response
                 }
             };
 
-            var url = $"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={_geminiApiKey}";
+            var url = $"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={_geminiApiKey}";
 
             // Retry logic với xử lý 429 và 503
             int maxRetries = 5;
