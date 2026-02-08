@@ -72,6 +72,10 @@ public partial class ApplicationDbContext : DbContext
     
     public virtual DbSet<PerformanceReview> PerformanceReviews { get; set; }
 
+    // DbSets cho TaskDraft (AI Generated)
+    public virtual DbSet<TaskDraft> TaskDrafts { get; set; }
+    public virtual DbSet<TaskDraftSkill> TaskDraftSkills { get; set; }
+
 
 //     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
 // #warning To protect potentially sensitive information in your connection string, you should move it out of source code. You can avoid scaffolding the connection string by using the Name= syntax to read it from configuration - see https://go.microsoft.com/fwlink/?linkid=2131148. For more guidance on storing connection strings, see https://go.microsoft.com/fwlink/?LinkId=723263.
@@ -335,6 +339,121 @@ public partial class ApplicationDbContext : DbContext
                 .HasForeignKey(d => d.ReviewerId)
                 .OnDelete(DeleteBehavior.SetNull)
                 .HasConstraintName("FK_ReportReview_User");
+        });
+
+        // 8. TaskDraft Entity
+        modelBuilder.Entity<TaskDraft>(entity =>
+        {
+            entity.ToTable("task_draft");
+
+            entity.HasKey(e => e.DraftId);
+
+            entity.Property(e => e.DraftId).HasColumnName("draftId");
+            entity.Property(e => e.ParentDraftId).HasColumnName("parentDraftId");
+            entity.Property(e => e.FileId).HasColumnName("fileId");
+            entity.Property(e => e.CreatedBy).HasColumnName("createdBy");
+            
+            entity.Property(e => e.Title)
+                .HasMaxLength(500)
+                .HasColumnName("title");
+            
+            entity.Property(e => e.Description).HasColumnName("description");
+            entity.Property(e => e.StartDate).HasColumnName("startDate");
+            entity.Property(e => e.EndDate).HasColumnName("endDate");
+            
+            entity.Property(e => e.EstimatedHours)
+                .HasColumnType("decimal(10,2)")
+                .HasColumnName("estimatedHours");
+            
+            entity.Property(e => e.RawAIResponse).HasColumnName("rawAIResponse");
+            
+            entity.Property(e => e.Status)
+                .HasMaxLength(20)
+                .HasDefaultValue("Pending")
+                .HasColumnName("status");
+            
+            entity.Property(e => e.ReviewedBy).HasColumnName("reviewedBy");
+            entity.Property(e => e.ReviewedAt).HasColumnName("reviewedAt");
+            entity.Property(e => e.ReviewNotes).HasColumnName("reviewNotes");
+            entity.Property(e => e.CreatedTaskId).HasColumnName("createdTaskId");
+            
+            entity.Property(e => e.CreatedAt)
+                .HasDefaultValueSql("(getdate())")
+                .HasColumnName("createdAt");
+
+            // Relationships
+            entity.HasOne(d => d.ParentDraft)
+                .WithMany(p => p.InverseParentDraft)
+                .HasForeignKey(d => d.ParentDraftId)
+                .OnDelete(DeleteBehavior.NoAction) // Tránh cycle cascade delete
+                .HasConstraintName("FK_TaskDraft_Parent");
+
+            entity.HasOne(d => d.File)
+                .WithMany()
+                .HasForeignKey(d => d.FileId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("FK_TaskDraft_File");
+
+            entity.HasOne(d => d.Creator)
+                .WithMany()
+                .HasForeignKey(d => d.CreatedBy)
+                .OnDelete(DeleteBehavior.Restrict) // Change to Restrict to avoid cycles
+                .HasConstraintName("FK_TaskDraft_Creator");
+
+            entity.HasOne(d => d.Reviewer)
+                .WithMany()
+                .HasForeignKey(d => d.ReviewedBy)
+                .OnDelete(DeleteBehavior.Restrict) // Change to Restrict to avoid cycles
+                .HasConstraintName("FK_TaskDraft_Reviewer");
+
+            entity.HasOne(d => d.CreatedTask)
+                .WithMany()
+                .HasForeignKey(d => d.CreatedTaskId)
+                .OnDelete(DeleteBehavior.SetNull)
+                .HasConstraintName("FK_TaskDraft_Task");
+        });
+
+        // 9. TaskDraftSkill Entity
+        modelBuilder.Entity<TaskDraftSkill>(entity =>
+        {
+            entity.ToTable("task_draft_skill");
+
+            entity.HasKey(e => e.DraftSkillId);
+
+            entity.Property(e => e.DraftSkillId).HasColumnName("draftSkillId");
+            entity.Property(e => e.DraftId).HasColumnName("draftId");
+            entity.Property(e => e.SkillId).HasColumnName("skillId");
+            
+            entity.Property(e => e.RequiredLevel).HasColumnName("requiredLevel");
+            entity.Property(e => e.Importance)
+                .HasDefaultValue(2)
+                .HasColumnName("importance");
+            
+            entity.Property(e => e.IsAIExtracted)
+                .HasDefaultValue(true)
+                .HasColumnName("isAIExtracted");
+            
+            entity.Property(e => e.CreatedAt)
+                .HasDefaultValueSql("(getdate())")
+                .HasColumnName("createdAt");
+
+            // Unique constraint
+            entity.HasIndex(e => new { e.DraftId, e.SkillId })
+                .IsUnique()
+                .HasDatabaseName("UQ_TaskDraftSkill_Draft_Skill");
+
+            // Relationships
+            entity.HasOne(d => d.Draft)
+                .WithMany(p => p.DraftSkills)
+                .HasForeignKey(d => d.DraftId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("FK_TaskDraftSkill_Draft");
+
+            entity.HasOne(d => d.Skill)
+                .WithMany()
+                .HasForeignKey(d => d.SkillId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("FK_TaskDraftSkill_Skill");
         });
 
         modelBuilder.Entity<Reportsummary>(entity =>

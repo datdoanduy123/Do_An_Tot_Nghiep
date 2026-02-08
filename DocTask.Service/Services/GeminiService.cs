@@ -68,67 +68,78 @@ namespace DocTask.Service.Services
         }
 
         public async Task<ChatResponse> AskWithFileAsync(int fileId, bool redo = false)
+    {
+        var cacheKey = redo ? $"{GetCacheKey(fileId)}_redo_{Guid.NewGuid()}" : GetCacheKey(fileId);
+
+        if (!redo && _memoryCache.TryGetValue(cacheKey, out ChatResponse cachedResponse))
         {
-            var cacheKey = redo ? $"{GetCacheKey(fileId)}_redo_{Guid.NewGuid()}" : GetCacheKey(fileId);
+            return cachedResponse;
+        }
 
-            if (!redo && _memoryCache.TryGetValue(cacheKey, out ChatResponse cachedResponse))
+        var file = await _uploadFileRepository.GetByIdAsync(fileId);
+        if (file == null)
+            throw new ArgumentException("File not found");
+
+        var fileContent = await _fileConvertService.GetFileContentAsync(file.FilePath);
+
+        // ⭐ LAYER 1: Extract project timeline bằng regex (rule-based) TRƯỚC khi gọi AI
+        var (projectStartDate, projectEndDate) = TimelineExtractor.ExtractProjectTimeline(fileContent);
+
+        // Chia nội dung file thành các chunk nhỏ (~4000-5000 ký tự mỗi chunk)
+        var chunks = SplitIntoChunks(fileContent, FileContextChunkSize);
+
+        var additionalContext = new Dictionary<string, string>
+        {
+            ["Ngày hiện tại"] = DateTime.Now.ToString("dd/MM/yyyy"),
+            ["Ngày kết thúc mặc định"] = DateTime.Now.AddDays(45).ToString("dd/MM/yyyy"),
+            ["Tên file"] = file.FileName
+        };
+
+        // ⭐ LAYER 2: Inject extracted timeline vào prompt (nếu có)
+        if (projectStartDate != null && projectEndDate != null)
+        {
+            additionalContext["Thời gian dự án (ĐÃ XÁC NHẬN)"] = TimelineExtractor.FormatForPrompt(projectStartDate, projectEndDate);
+            additionalContext["⚠️ PROJECT_START_DATE"] = projectStartDate?.ToString("dd/MM/yyyy");
+            additionalContext["⚠️ PROJECT_END_DATE"] = projectEndDate?.ToString("dd/MM/yyyy");
+        }
+
+        var chunkResponses = new List<JsonElement>();
+
+        // Gọi Gemini cho từng chunk
+        foreach (var chunk in chunks)
+        {
+            var combinedMessage = redo
+                ? $"[RETRY_ID: {Guid.NewGuid()}]\n[FILE CONTENT CHUNK]\n{chunk}\n\n"
+                : $"[FILE CONTENT CHUNK]\n{chunk}\n\n";
+
+            var responseText = await AskPlanAsync(combinedMessage, PromptContextType.GenerateTasks, additionalContext, temperature: redo ? 0.75 : 0.0) as string;
+
+            if (!string.IsNullOrWhiteSpace(responseText))
             {
-                return cachedResponse;
-            }
-
-            var file = await _uploadFileRepository.GetByIdAsync(fileId);
-            if (file == null)
-                throw new ArgumentException("File not found");
-
-            var fileContent = await _fileConvertService.GetFileContentAsync(file.FilePath);
-
-            // Chia nội dung file thành các chunk nhỏ (~4000-5000 ký tự mỗi chunk)
-            var chunks = SplitIntoChunks(fileContent, FileContextChunkSize);
-
-            var additionalContext = new Dictionary<string, string>
-            {
-                ["Ngày hiện tại"] = DateTime.Now.ToString("dd/MM/yyyy"),
-                ["Ngày kết thúc mặc định"] = DateTime.Now.AddDays(45).ToString("dd/MM/yyyy"),
-                ["Tên file"] = file.FileName
-            };
-
-            var chunkResponses = new List<JsonElement>();
-
-            // Gọi Gemini cho từng chunk
-            foreach (var chunk in chunks)
-            {
-                var combinedMessage = redo
-                    ? $"[RETRY_ID: {Guid.NewGuid()}]\n[FILE CONTENT CHUNK]\n{chunk}\n\n"
-                    : $"[FILE CONTENT CHUNK]\n{chunk}\n\n";
-
-                var responseText = await AskPlanAsync(combinedMessage, PromptContextType.GenerateTasks, additionalContext, temperature: redo ? 0.75 : 0.0) as string;
-
-                if (!string.IsNullOrWhiteSpace(responseText))
+                try
                 {
-                    try
-                    {
-                        using var doc = JsonDocument.Parse(responseText);
-                        chunkResponses.Add(doc.RootElement.Clone());
-                    }
-                    catch
-                    {
-                        Console.WriteLine("Chunk JSON parse failed, skipping chunk.");
-                    }
+                    using var doc = JsonDocument.Parse(responseText);
+                    chunkResponses.Add(doc.RootElement.Clone());
+                }
+                catch
+                {
+                    Console.WriteLine("Chunk JSON parse failed, skipping chunk.");
                 }
             }
-
-            // Merge các chunk JSON lại
-            var merged = MergeChunkResponses(chunkResponses);
-
-            var response = new ChatResponse
-            {
-                Response = JsonSerializer.Serialize(merged, new JsonSerializerOptions { WriteIndented = true })
-            };
-
-            _memoryCache.Set(cacheKey, response, TimeSpan.FromMinutes(30));
-            Console.WriteLine(_memoryCache.TryGetValue(cacheKey, out _) ? " Đã lưu vào cache" : " Không lưu được vào cache");
-            return response;
         }
+
+        // ⭐ LAYER 3: Merge và override với extracted timeline
+        var merged = MergeChunkResponses(chunkResponses, projectStartDate, projectEndDate);
+
+        var response = new ChatResponse
+        {
+            Response = JsonSerializer.Serialize(merged, new JsonSerializerOptions { WriteIndented = true })
+        };
+
+        _memoryCache.Set(cacheKey, response, TimeSpan.FromMinutes(30));
+        Console.WriteLine(_memoryCache.TryGetValue(cacheKey, out _) ? " Đã lưu vào cache" : " Không lưu được vào cache");
+        return response;
+    }    
 
         public Task<ChatResponse?> GetPreviewAsync(int fileId)
         {
@@ -531,7 +542,11 @@ namespace DocTask.Service.Services
         }
 
         // Helper: merge các chunk JSON thành 1
-        private object MergeChunkResponses(List<JsonElement> chunkResponses)
+        private object MergeChunkResponses(
+            List<JsonElement> chunkResponses, 
+            DateTime? projectStartDate = null,  // ⭐ NEW: extracted timeline từ file
+            DateTime? projectEndDate = null      // ⭐ NEW: extracted timeline từ file
+        )
         {
             if (chunkResponses.Count == 0) return new { subtasks = Array.Empty<object>() };
 
@@ -545,8 +560,8 @@ namespace DocTask.Service.Services
                 : "";
 
             var mergedSubtasks = new List<JsonElement>();
-            DateTime? startDate = null;
-            DateTime? endDate = null;
+            DateTime? aiStartDate = null;   // Timeline từ AI
+            DateTime? aiEndDate = null;     // Timeline từ AI
             decimal? estimatedHours = null;
             var mergedSkills = new List<JsonElement>();
 
@@ -558,16 +573,16 @@ namespace DocTask.Service.Services
                     mergedSubtasks.AddRange(subtasks.EnumerateArray());
                 }
 
-                // Lấy startDate sớm nhất
+                // Lấy startDate sớm nhất từ AI
                 if (chunk.TryGetProperty("startDate", out var s) && DateTime.TryParse(s.GetString(), out var sd))
                 {
-                    startDate = startDate == null || sd < startDate ? sd : startDate;
+                    aiStartDate = aiStartDate == null || sd < aiStartDate ? sd : aiStartDate;
                 }
 
-                // Lấy endDate muộn nhất
+                // Lấy endDate muộn nhất từ AI
                 if (chunk.TryGetProperty("endDate", out var e) && DateTime.TryParse(e.GetString(), out var ed))
                 {
-                    endDate = endDate == null || ed > endDate ? ed : endDate;
+                    aiEndDate = aiEndDate == null || ed > aiEndDate ? ed : aiEndDate;
                 }
 
                 // Merge estimatedHours (tính tổng)
@@ -583,12 +598,45 @@ namespace DocTask.Service.Services
                 }
             }
 
+            // ⭐⭐⭐ LAYER 3 - CRITICAL: Override với extracted timeline (KHÔNG PHỤ THUỘC AI)
+            // Đây là lớp bảo vệ quan trọng nhất, đảm bảo 100% correctness
+            string finalStartDate;
+            string finalEndDate;
+
+            if (projectStartDate != null && projectEndDate != null)
+            {
+                // Safety check: startDate <= endDate
+                if (projectStartDate > projectEndDate)
+                {
+                    throw new InvalidOperationException(
+                        $"[MergeChunkResponses] Invalid project timeline: " +
+                        $"startDate ({projectStartDate:dd/MM/yyyy}) > endDate ({projectEndDate:dd/MM/yyyy})"
+                    );
+                }
+
+                // Override với extracted timeline (rule-based)
+                finalStartDate = projectStartDate.Value.ToString("dd/MM/yyyy");
+                finalEndDate = projectEndDate.Value.ToString("dd/MM/yyyy");
+
+                Console.WriteLine($"[MergeChunkResponses] ✓ Overriding AI timeline with extracted timeline:");
+                Console.WriteLine($"  - AI suggested: {aiStartDate?.ToString("dd/MM/yyyy") ?? "N/A"} - {aiEndDate?.ToString("dd/MM/yyyy") ?? "N/A"}");
+                Console.WriteLine($"  - Using extracted: {finalStartDate} - {finalEndDate}");
+            }
+            else
+            {
+                // Fallback: Dùng timeline từ AI (hoặc default)
+                finalStartDate = aiStartDate?.ToString("dd/MM/yyyy") ?? DateTime.Now.ToString("dd/MM/yyyy");
+                finalEndDate = aiEndDate?.ToString("dd/MM/yyyy") ?? DateTime.Now.AddDays(45).ToString("dd/MM/yyyy");
+
+                Console.WriteLine($"[MergeChunkResponses] ⚠ No extracted timeline, using AI dates: {finalStartDate} - {finalEndDate}");
+            }
+
             return new
             {
                 title,
                 description,
-                startDate = startDate?.ToString("dd/MM/yyyy") ?? DateTime.Now.ToString("dd/MM/yyyy"),
-                endDate = endDate?.ToString("dd/MM/yyyy") ?? DateTime.Now.AddDays(45).ToString("dd/MM/yyyy"),
+                startDate = finalStartDate,
+                endDate = finalEndDate,
                 estimatedHours = estimatedHours ?? 0,
                 requiredSkills = mergedSkills,
                 subtasks = mergedSubtasks
