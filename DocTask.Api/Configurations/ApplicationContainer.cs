@@ -42,7 +42,10 @@ namespace DockTask.Api.Configurations
             services.AddScoped<IFrequencyRepository, FrequencyRepository>();
             services.AddScoped<IUnitRepository, UnitRepository>();
             services.AddScoped<IAgentRepository, AgentRepository>();
-            
+
+            services.AddScoped<ITaskDraftRepository, TaskDraftRepository>();
+            services.AddScoped<ITaskDraftService, TaskDraftService>();
+
             // Other
             services.AddHttpClient<IGeminiService, GeminiService>();
             return services;
