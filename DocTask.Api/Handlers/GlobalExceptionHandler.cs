@@ -17,6 +17,13 @@ public class GlobalExceptionHandler : IExceptionHandler
     public async ValueTask<bool> TryHandleAsync(HttpContext httpContext, Exception exception, CancellationToken cancellationToken)
     {
         _logger.LogError(exception, "AN ERROR OCCURRED: {Message}", exception.Message);
+
+        if (httpContext.Response.HasStarted)
+        {
+            _logger.LogWarning("The response has already started, the exception handler will not be executed.");
+            return true;
+        }
+
         httpContext.Response.ContentType = "application/json";
         
         int statusCode = exception switch

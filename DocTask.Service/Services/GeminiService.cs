@@ -40,6 +40,7 @@ namespace DocTask.Service.Services
         private readonly IFileConvertService _fileConvertService;
         private readonly IAgentRepository _agentRepository;
         private readonly IMemoryCache _memoryCache;
+        private readonly ITaskDraftService _taskDraftService;
         private const int FileContextChunkSize = 3000;
 
         public GeminiService(
@@ -52,7 +53,8 @@ namespace DocTask.Service.Services
             ApplicationDbContext context,
             IFileConvertService fileConvertService,
             IMemoryCache memoryCache,
-            IAgentRepository agentRepository
+            IAgentRepository agentRepository,
+            ITaskDraftService taskDraftService
         )
         {
             _httpClient = httpClient;
@@ -65,9 +67,10 @@ namespace DocTask.Service.Services
             _fileConvertService = fileConvertService;
             _memoryCache = memoryCache;
             _agentRepository = agentRepository;
+            _taskDraftService = taskDraftService;
         }
 
-        public async Task<ChatResponse> AskWithFileAsync(int fileId, bool redo = false)
+        public async Task<ChatResponse> AskWithFileAsync(int fileId, int userId, bool redo = false)
     {
         var cacheKey = redo ? $"{GetCacheKey(fileId)}_redo_{Guid.NewGuid()}" : GetCacheKey(fileId);
 
@@ -131,13 +134,16 @@ namespace DocTask.Service.Services
         // ⭐ LAYER 3: Merge và override với extracted timeline
         var merged = MergeChunkResponses(chunkResponses, projectStartDate, projectEndDate);
 
+        // Lưu vào Draft thay vì cache
+        var draftId = await _taskDraftService.CreateDraftFromGeminiAsync(merged, fileId, userId);
+
         var response = new ChatResponse
         {
-            Response = JsonSerializer.Serialize(merged, new JsonSerializerOptions { WriteIndented = true })
+            Response = "Đã tạo bản nháp thành công",
+            DraftId = draftId,
+            AiResponse = merged // mergerd now returns GeminiTaskDto
         };
 
-        _memoryCache.Set(cacheKey, response, TimeSpan.FromMinutes(30));
-        Console.WriteLine(_memoryCache.TryGetValue(cacheKey, out _) ? " Đã lưu vào cache" : " Không lưu được vào cache");
         return response;
     }    
 
@@ -542,104 +548,160 @@ namespace DocTask.Service.Services
         }
 
         // Helper: merge các chunk JSON thành 1
-        private object MergeChunkResponses(
+        private GeminiTaskDto MergeChunkResponses(
             List<JsonElement> chunkResponses, 
-            DateTime? projectStartDate = null,  // ⭐ NEW: extracted timeline từ file
-            DateTime? projectEndDate = null      // ⭐ NEW: extracted timeline từ file
+            DateTime? projectStartDate = null,
+            DateTime? projectEndDate = null
         )
         {
-            if (chunkResponses.Count == 0) return new { subtasks = Array.Empty<object>() };
+            if (chunkResponses.Count == 0) return new GeminiTaskDto();
 
-            // Lấy title và description từ chunk đầu tiên (với safe access)
+            // Lấy title và description từ chunk đầu tiên
             var firstChunk = chunkResponses[0];
-            string title = firstChunk.TryGetProperty("title", out var titleProp) 
-                ? (titleProp.GetString() ?? "Untitled Task") 
-                : "Untitled Task";
-            string description = firstChunk.TryGetProperty("description", out var descProp) 
-                ? (descProp.GetString() ?? "") 
-                : "";
+            
+            // Helper: lấy property case-insensitive
+            JsonElement? GetProperty(JsonElement element, string name)
+            {
+                if (element.TryGetProperty(name, out var prop)) return prop;
+                if (element.TryGetProperty(char.ToUpper(name[0]) + name.Substring(1), out var propUpper)) return propUpper;
+                if (element.TryGetProperty(name.ToUpper(), out var propAllUpper)) return propAllUpper;
+                return null;
+            }
+
+            string title = "Untitled Task";
+            string description = "";
+
+            var titlePropRaw = GetProperty(firstChunk, "title");
+            if (titlePropRaw.HasValue) title = titlePropRaw.Value.GetString() ?? title;
+            
+            var descPropRaw = GetProperty(firstChunk, "description");
+            if (descPropRaw.HasValue) description = descPropRaw.Value.GetString() ?? "";
 
             var mergedSubtasks = new List<JsonElement>();
-            DateTime? aiStartDate = null;   // Timeline từ AI
-            DateTime? aiEndDate = null;     // Timeline từ AI
+            DateTime? aiStartDate = null;
+            DateTime? aiEndDate = null;
             decimal? estimatedHours = null;
             var mergedSkills = new List<JsonElement>();
+
+            string[] dateFormats = { "dd/MM/yyyy", "yyyy-MM-dd", "MM/dd/yyyy", "yyyy/MM/dd" };
 
             foreach (var chunk in chunkResponses)
             {
                 // Merge subtasks
-                if (chunk.TryGetProperty("subtasks", out var subtasks) && subtasks.ValueKind == JsonValueKind.Array)
+                var subtasksProp = GetProperty(chunk, "subtasks");
+                if (subtasksProp.HasValue && subtasksProp.Value.ValueKind == JsonValueKind.Array)
                 {
-                    mergedSubtasks.AddRange(subtasks.EnumerateArray());
+                    mergedSubtasks.AddRange(subtasksProp.Value.EnumerateArray());
                 }
 
                 // Lấy startDate sớm nhất từ AI
-                if (chunk.TryGetProperty("startDate", out var s) && DateTime.TryParse(s.GetString(), out var sd))
+                var sProp = GetProperty(chunk, "startDate");
+                if (sProp.HasValue && sProp.Value.ValueKind == JsonValueKind.String)
                 {
-                    aiStartDate = aiStartDate == null || sd < aiStartDate ? sd : aiStartDate;
+                    string sVal = sProp.Value.GetString();
+                    if (DateTime.TryParseExact(sVal, dateFormats, CultureInfo.InvariantCulture, DateTimeStyles.None, out var sd))
+                    {
+                        aiStartDate = aiStartDate == null || sd < aiStartDate ? sd : aiStartDate;
+                    }
                 }
 
                 // Lấy endDate muộn nhất từ AI
-                if (chunk.TryGetProperty("endDate", out var e) && DateTime.TryParse(e.GetString(), out var ed))
+                var eProp = GetProperty(chunk, "endDate");
+                if (eProp.HasValue && eProp.Value.ValueKind == JsonValueKind.String)
                 {
-                    aiEndDate = aiEndDate == null || ed > aiEndDate ? ed : aiEndDate;
+                    string eVal = eProp.Value.GetString();
+                    if (DateTime.TryParseExact(eVal, dateFormats, CultureInfo.InvariantCulture, DateTimeStyles.None, out var ed))
+                    {
+                        aiEndDate = aiEndDate == null || ed > aiEndDate ? ed : aiEndDate;
+                    }
                 }
 
-                // Merge estimatedHours (tính tổng)
-                if (chunk.TryGetProperty("estimatedHours", out var hours) && hours.ValueKind == JsonValueKind.Number)
+                // Merge estimatedHours
+                var hProp = GetProperty(chunk, "estimatedHours");
+                if (hProp.HasValue && hProp.Value.ValueKind == JsonValueKind.Number)
                 {
-                    estimatedHours = (estimatedHours ?? 0) + hours.GetDecimal();
+                    estimatedHours = (estimatedHours ?? 0) + hProp.Value.GetDecimal();
                 }
 
                 // Merge requiredSkills
-                if (chunk.TryGetProperty("requiredSkills", out var skills) && skills.ValueKind == JsonValueKind.Array)
+                var skillsProp = GetProperty(chunk, "requiredSkills");
+                if (skillsProp.HasValue && skillsProp.Value.ValueKind == JsonValueKind.Array)
                 {
-                    mergedSkills.AddRange(skills.EnumerateArray());
+                    mergedSkills.AddRange(skillsProp.Value.EnumerateArray());
                 }
             }
 
-            // ⭐⭐⭐ LAYER 3 - CRITICAL: Override với extracted timeline (KHÔNG PHỤ THUỘC AI)
-            // Đây là lớp bảo vệ quan trọng nhất, đảm bảo 100% correctness
-            string finalStartDate;
-            string finalEndDate;
+            // ⭐ LAYER 3: Override timeline
+            DateTime finalStartDate;
+            DateTime finalEndDate;
 
             if (projectStartDate != null && projectEndDate != null)
             {
-                // Safety check: startDate <= endDate
                 if (projectStartDate > projectEndDate)
                 {
-                    throw new InvalidOperationException(
-                        $"[MergeChunkResponses] Invalid project timeline: " +
-                        $"startDate ({projectStartDate:dd/MM/yyyy}) > endDate ({projectEndDate:dd/MM/yyyy})"
-                    );
+                    finalStartDate = aiStartDate ?? DateTime.Now;
+                    finalEndDate = aiEndDate ?? DateTime.Now.AddDays(45);
                 }
-
-                // Override với extracted timeline (rule-based)
-                finalStartDate = projectStartDate.Value.ToString("dd/MM/yyyy");
-                finalEndDate = projectEndDate.Value.ToString("dd/MM/yyyy");
-
-                Console.WriteLine($"[MergeChunkResponses] ✓ Overriding AI timeline with extracted timeline:");
-                Console.WriteLine($"  - AI suggested: {aiStartDate?.ToString("dd/MM/yyyy") ?? "N/A"} - {aiEndDate?.ToString("dd/MM/yyyy") ?? "N/A"}");
-                Console.WriteLine($"  - Using extracted: {finalStartDate} - {finalEndDate}");
+                else
+                {
+                    finalStartDate = projectStartDate.Value;
+                    finalEndDate = projectEndDate.Value;
+                }
             }
             else
             {
-                // Fallback: Dùng timeline từ AI (hoặc default)
-                finalStartDate = aiStartDate?.ToString("dd/MM/yyyy") ?? DateTime.Now.ToString("dd/MM/yyyy");
-                finalEndDate = aiEndDate?.ToString("dd/MM/yyyy") ?? DateTime.Now.AddDays(45).ToString("dd/MM/yyyy");
-
-                Console.WriteLine($"[MergeChunkResponses] ⚠ No extracted timeline, using AI dates: {finalStartDate} - {finalEndDate}");
+                finalStartDate = aiStartDate ?? DateTime.Now;
+                finalEndDate = aiEndDate ?? DateTime.Now.AddDays(45);
             }
 
-            return new
+            // Convert JsonElements to DTOs
+            var subtasksDto = new List<GeminiSubtaskDto>();
+            var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+            
+            foreach (var item in mergedSubtasks)
             {
-                title,
-                description,
-                startDate = finalStartDate,
-                endDate = finalEndDate,
-                estimatedHours = estimatedHours ?? 0,
-                requiredSkills = mergedSkills,
-                subtasks = mergedSubtasks
+                try {
+                    var dto = JsonSerializer.Deserialize<GeminiSubtaskDto>(item.GetRawText(), options);
+                    if (dto != null)
+                    {
+                        // Deduplicate và giới hạn skill cho subtask (max 4)
+                        dto.RequiredSkills = dto.RequiredSkills
+                            .GroupBy(s => s.SkillName.Trim().ToLower())
+                            .Select(g => g.OrderByDescending(s => s.Importance).ThenByDescending(s => s.RequiredLevel).First())
+                            .Take(4)
+                            .ToList();
+                        subtasksDto.Add(dto);
+                    }
+                } catch {}
+            }
+
+            var skillsDto = new List<GeminiSkillRequirementDTO>();
+            foreach (var item in mergedSkills)
+            {
+                try {
+                    var dto = JsonSerializer.Deserialize<GeminiSkillRequirementDTO>(item.GetRawText(), options);
+                    if (dto != null) skillsDto.Add(dto);
+                } catch {}
+            }
+
+            // Deduplicate và giới hạn skill cho task cha (max 8)
+            var finalSkills = skillsDto
+                .GroupBy(s => s.SkillName.Trim().ToLower())
+                .Select(g => g.OrderByDescending(s => s.Importance).ThenByDescending(s => s.RequiredLevel).First())
+                .OrderByDescending(s => s.Importance)
+                .ThenByDescending(s => s.RequiredLevel)
+                .Take(8)
+                .ToList();
+
+            return new GeminiTaskDto
+            {
+                Title = title,
+                Description = description,
+                StartDate = finalStartDate,
+                EndDate = finalEndDate,
+                EstimatedHours = estimatedHours,
+                RequiredSkills = finalSkills,
+                Subtasks = subtasksDto
             };
         }
 

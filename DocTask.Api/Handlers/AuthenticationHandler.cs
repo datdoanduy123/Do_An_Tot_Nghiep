@@ -56,6 +56,13 @@ public class AuthenticationHandler
         }
         catch (Exception ex)
         {
+            if (context.Response.HasStarted)
+            {
+                // Nếu response đã bắt đầu, không thể set StatusCode hay Header nữa
+                // Có thể log lỗi ở đây
+                return;
+            }
+
             if (ex is BaseException baseException)
                 context.Response.StatusCode = baseException.StatusCode;
             else

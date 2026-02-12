@@ -10,7 +10,7 @@ namespace DocTask.Core.Interfaces.Services
 {
     public interface IGeminiService
     {
-        Task<ChatResponse> AskWithFileAsync(int fileId, bool redo);
+        Task<ChatResponse> AskWithFileAsync(int fileId, int userId, bool redo);
         Task<ChatResponse?> GetPreviewAsync(int fileId);
         bool RejectPlan(int fileId);
         Task<(byte[] fileContent, string fileName, string contentType)> AskWithTaskSummaryAsync(int taskId, int userId, string format);

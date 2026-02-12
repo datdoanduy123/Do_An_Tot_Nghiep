@@ -7,7 +7,12 @@ public static class ControllerConfiguration
 {
     public static IServiceCollection AddControllerConfiguration(this IServiceCollection services)
     {
-        services.AddControllers().ConfigureApiBehaviorOptions(options =>
+        services.AddControllers()
+            .AddJsonOptions(options =>
+            {
+                options.JsonSerializerOptions.ReferenceHandler = System.Text.Json.Serialization.ReferenceHandler.IgnoreCycles;
+            })
+            .ConfigureApiBehaviorOptions(options =>
         {
             options.InvalidModelStateResponseFactory = context =>
             {

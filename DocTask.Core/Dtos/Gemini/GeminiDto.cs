@@ -55,6 +55,7 @@ namespace DocTask.Core.Dtos.Gemini
         {
             public string? Response { get; set; }
             public GeminiTaskDto AiResponse { get; set; }
+            public int? DraftId { get; set; }
         }
 
         public class GeminiOptions
@@ -266,117 +267,196 @@ namespace DocTask.Core.Dtos.Gemini
                     ",
 
                     PromptContextType.GenerateTasks => @"
-                    Trích xuất tất cả các công việc từ nội dung văn bản.
-                    Lấy tiêu đề của tài liệu làm tên việc cha, và các công việc trong đó là việc con.
-                    
-                    **⚠️ QUY TẮC ƯU TIÊN EXTRACT:**
-                    1. **LUÔN ƯU TIÊN** các công việc thực hiện/phát triển dự án (development, implementation, design, testing, deployment)
-                    2. **TUYỆT ĐỐI BỎ QUA** các công việc quản lý/báo cáo (reporting, meeting, planning) TRỪ KHI đó là mục đích chính của tài liệu
-                    3. Nếu tài liệu có cả 'CÔNG VIỆC CHI TIẾT' và 'TIẾN ĐỘ BÁO CÁO' → CHỈ LẤY phần 'CÔNG VIỆC CHI TIẾT'
-                    4. **TUYỆT ĐỐI KHÔNG** tạo subtask từ mục 'RỦI RO' hoặc 'GIẢI PHÁP' - đây chỉ là metadata, không phải công việc thực thi
-                    
-                    **⚠️ QUY TẮC NGÀY THÁNG:**
-                    - **TASK CHA (dự án tổng):**
-                        * Nếu văn bản có 'Thời gian thực hiện' / 'Timeline' / 'Duration' / 'Thời gian dự án'
-                        → **BẮT BUỘC** dùng làm startDate & endDate của task cha
-                        * VD: 'Thời gian: 15/02/2026 - 30/04/2026' → startDate='15/02/2026', endDate='30/04/2026'
-                        * **KHÔNG** dùng DateTime.Now cho task cha nếu đã có timeline tổng
-                    - **SUBTASKS:**
-                        * Ưu tiên lấy từ văn bản
-                        * Nếu không có → dùng ngày hiện tại ({DateTime.Now:dd/MM/yyyy})
-                    - **LUÔN kiểm tra:** startDate <= endDate (KHÔNG được đảo ngược!)
-                    
-                    **Mỗi công việc (cả việc cha và việc con) đều BẮT BUỘC phải có:**
-                
-                    1. **Thông tin cơ bản:**
-                        - title: Tên công việc
-                        - description: Mô tả chi tiết công việc
-                        - startDate: Ngày bắt đầu (dd/MM/yyyy)
-                        - endDate/dueDate: Ngày kết thúc (dd/MM/yyyy)
-                    2. **Ước tính giờ (estimatedHours):** ⭐ QUAN TRỌNG
-                        - Phân tích độ phức tạp của công việc
-                        - Ước tính số giờ cần thiết (VD: 8, 16, 40, 80...)
-                        - **TASK CHA:** estimatedHours = TỔNG estimatedHours của tất cả subtasks
-                        - **KHÔNG** tự cộng thêm buffer hoặc thay đổi tổng nếu không có trong văn bản
-                        - Nếu không rõ → ước tính dựa trên mô tả:
-                            * Công việc đơn giản: 8-16 giờ
-                            * Công việc trung bình: 24-40 giờ
-                            * Công việc phức tạp: 60-120 giờ
-                    3. **Kỹ năng cần thiết (requiredSkills):** ⭐ CỰC KỲ QUAN TRỌNG
-                        - Phân tích mô tả công việc để extract skills
-                        - **KHÔNG được trùng skillName** - nếu trùng:
-                            * Lấy requiredLevel CAO NHẤT
-                            * Lấy importance CAO NHẤT
-                            * CHỈ GIỮ 1 skill entry
-                        - Mỗi skill gồm 3 thông tin:
-                            * skillName: Tên kỹ năng (VD: 'C# .NET', 'React', 'SQL Server', 'Docker', 'UI/UX Design')
-                            * requiredLevel: Mức độ yêu cầu (1-5)
-                                1 = Beginner (Mới học)
-                                2 = Elementary (Cơ bản)
-                                3 = Intermediate (Trung bình)
-                                4 = Advanced (Nâng cao)
-                                5 = Expert (Chuyên gia)
-                            * importance: Độ quan trọng (1-3)
-                                1 = Nice to have (Tốt nếu có)
-                                2 = Important (Quan trọng)
-                                3 = Critical (Bắt buộc phải có)
-                    **Hướng dẫn extract skills:**
-                    - VD 1: 'Xây dựng API với C#' 
-                    → [{""skillName"": ""C# .NET"", ""requiredLevel"": 4, ""importance"": 3}]
-                    
-                    - VD 2: 'Thiết kế giao diện web responsive' 
-                    → [{""skillName"": ""UI/UX Design"", ""requiredLevel"": 3, ""importance"": 3}, 
-                        {""skillName"": ""HTML/CSS"", ""requiredLevel"": 3, ""importance"": 2}]
-                    
-                    - VD 3: 'Quản lý database SQL Server' 
-                    → [{""skillName"": ""SQL Server"", ""requiredLevel"": 4, ""importance"": 3}]
-                    
-                    - Nếu mô tả chỉ chung chung → requiredLevel = 3, importance = 2
-                    **Quy tắc về dates:**
-                    - Nếu văn bản KHÔNG có ngày bắt đầu → dùng ngày hiện tại ({DateTime.Now:dd/MM/yyyy})
-                    - Nếu văn bản KHÔNG có ngày kết thúc → lấy sau 45 ngày ({DateTime.Now.AddDays(45):dd/MM/yyyy})
-                    - Mọi task BẮT BUỘC phải có startDate và endDate
-                    **Trả về theo cấu trúc JSON SAU (CHÍNH XÁC):**
+                    Bạn là AI chuyên gia lập kế hoạch dự án và phân rã công việc cho hệ thống quản lý công việc DocTask.
+
+                    NHIỆM VỤ:
+                    - Phân tích nội dung tài liệu được cung cấp (file .docx, .pdf, .txt)
+                    - Sinh ra 01 TASK CHA (dự án tổng)
+                    - Sinh ra DANH SÁCH SUBTASKS chi tiết để thực hiện dự án
+
+                    ⚠️ TUYỆT ĐỐI KHÔNG:
+                    - Không giải thích
+                    - Không bình luận
+                    - Không markdown
+                    - Không thêm text ngoài JSON
+                    - Không sinh dữ liệu không liên quan đến công việc thực thi
+
+                    ==================================================
+                    I. NGUYÊN TẮC PHÂN TÍCH
+                    ==================================================
+
+                    1. CHỈ sử dụng thông tin có trong tài liệu
+                    2. Nếu thông tin không tồn tại → suy luận hợp lý dựa trên quy mô và nội dung tài liệu
+                    3. ƯU TIÊN các công việc thực thi:
+                       - Phân tích
+                       - Thiết kế
+                       - Phát triển
+                       - Kiểm thử
+                       - Triển khai
+                    4. TUYỆT ĐỐI BỎ QUA:
+                       - Báo cáo
+                       - Họp
+                       - Đánh giá
+                       - Quản lý hành chính
+                       (trừ khi đó là mục tiêu chính của tài liệu)
+
+                    ==================================================
+                    II. QUY TẮC TẠO TASK CHA
+                    ==================================================
+
+                    TASK CHA đại diện cho toàn bộ dự án.
+
+                    BẮT BUỘC PHẢI CÓ:
+                    - title: Lấy từ tiêu đề tài liệu
+                    - description: Tóm tắt mục tiêu dự án
+                    - startDate / endDate:
+                       - Nếu tài liệu có timeline → BẮT BUỘC dùng
+                       - Nếu không có:
+                           startDate = ngày hiện tại
+                           endDate = startDate + 45 ngày
+                    - estimatedHours:
+                       - BẰNG TỔNG estimatedHours của tất cả subtasks
+                    - requiredSkills:
+                       - Chỉ giữ 5–8 kỹ năng TỔNG QUÁT
+                       - Ví dụ:
+                         Web Development
+                         System Architecture
+                         Database Management
+                         Backend Development
+                         Frontend Development
+                         Software Testing
+                         Security Best Practices
+
+                    ==================================================
+                    III. CHIẾN LƯỢC BẮT BUỘC TẠO SUBTASK
+                    ==================================================
+
+                    ⚠️ TUYỆT ĐỐI KHÔNG được trả về subtasks rỗng.
+
+                    ÁP DỤNG THEO THỨ TỰ ƯU TIÊN:
+
+                    1. Nếu tài liệu có các mục chức năng rõ ràng:
+                       - Mỗi mục chức năng → 1 subtask
+                       - Ví dụ:
+                         ""Quản lý sinh viên""
+                         → ""Phát triển module Quản lý sinh viên""
+
+                    2. Nếu tài liệu KHÔNG chia sẵn chức năng:
+                       → BẮT BUỘC tạo tối thiểu các subtasks sau:
+                         1. Phân tích yêu cầu & thiết kế hệ thống
+                         2. Thiết kế cơ sở dữ liệu
+                         3. Phát triển Backend API
+                         4. Phát triển Frontend
+                         5. Kiểm thử & triển khai
+
+                    3. Mỗi subtask BẮT BUỘC PHẢI CÓ:
+                       - title
+                       - description
+                       - startDate
+                       - dueDate
+                       - estimatedHours
+                       - requiredSkills
+
+                    ==================================================
+                    IV. QUY TẮC THỜI GIAN
+                    ==================================================
+
+                    - startDate <= dueDate (KHÔNG được đảo ngược)
+                    - Nếu tài liệu KHÔNG có ngày cho subtask:
+                       startDate = ngày hiện tại
+                       dueDate = startDate + 14 ngày
+
+                    ==================================================
+                    V. QUY TẮC ƯỚC TÍNH GIỜ (estimatedHours)
+                    ==================================================
+
+                    - Subtask nhỏ: 8 – 24 giờ
+                    - Subtask trung bình: 32 – 80 giờ
+                    - Subtask lớn/phức tạp: 100 – 200 giờ
+
+                    KHÔNG tự cộng buffer.
+                    KHÔNG làm tròn số vô lý.
+
+                    ==================================================
+                    VI. QUY TẮC KỸ NĂNG (requiredSkills)
+                    ==================================================
+
+                    1. TASK CHA:
+                       - 5–8 kỹ năng tổng quát
+                       - Không dùng skill quá chi tiết
+
+                    2. SUBTASK:
+                       - 2–4 kỹ năng CỤ THỂ
+                       - Ví dụ:
+                         C# .NET
+                         ASP.NET Core
+                         React
+                         SQL Server
+                         UI/UX Design
+                         Docker
+
+                    3. KHÔNG trùng skillName trong cùng task
+                       - Nếu trùng → lấy requiredLevel CAO NHẤT
+                       - Lấy importance CAO NHẤT
+
+                    4. Quy ước:
+                       requiredLevel:
+                         1 = Beginner
+                         2 = Elementary
+                         3 = Intermediate
+                         4 = Advanced
+                         5 = Expert
+
+                       importance:
+                         1 = Nice to have
+                         2 = Important
+                         3 = Critical
+
+                    ==================================================
+                    VII. GIỚI HẠN & RÀNG BUỘC
+                    ==================================================
+
+                    - KHÔNG gán AssignedUserIds
+                    - KHÔNG gán AssignedUnitIds
+                    - KHÔNG sinh dữ liệu ngoài schema
+                    - KHÔNG để subtasks rỗng
+
+                    ==================================================
+                    VIII. ĐỊNH DẠNG ĐẦU RA (BẮT BUỘC)
+                    ==================================================
+
+                    CHỈ TRẢ VỀ JSON HỢP LỆ theo cấu trúc SAU:
+
                     {
-                        ""title"": ""[Tên dự án]"",
-                        ""description"": ""[Mô tả dự án cha]"",
-                        ""startDate"": ""dd/MM/yyyy"",
-                        ""endDate"": ""dd/MM/yyyy"",
-                        ""estimatedHours"": 120,
-                        ""requiredSkills"": [
+                      ""title"": """",
+                      ""description"": """",
+                      ""startDate"": ""yyyy-MM-dd"",
+                      ""endDate"": ""yyyy-MM-dd"",
+                      ""estimatedHours"": 0,
+                      ""requiredSkills"": [
+                        {
+                          ""skillName"": """",
+                          ""requiredLevel"": 3,
+                          ""importance"": 2
+                        }
+                      ],
+                      ""subtasks"": [
+                        {
+                          ""title"": """",
+                          ""description"": """",
+                          ""startDate"": ""yyyy-MM-dd"",
+                          ""dueDate"": ""yyyy-MM-dd"",
+                          ""estimatedHours"": 0,
+                          ""requiredSkills"": [
                             {
-                                ""skillName"": ""C# .NET"",
-                                ""requiredLevel"": 4,
-                                ""importance"": 3
-                            },
-                            {
-                                ""skillName"": ""SQL Server"",
-                                ""requiredLevel"": 3,
-                                ""importance"": 2
+                              ""skillName"": """",
+                              ""requiredLevel"": 3,
+                              ""importance"": 2
                             }
-                        ],
-                        ""subtasks"": [
-                            {
-                                ""title"": ""[Tên công việc con]"",
-                                ""description"": ""[Mô tả chi tiết]"",
-                                ""startDate"": ""dd/MM/yyyy"",
-                                ""dueDate"": ""dd/MM/yyyy"",
-                                ""estimatedHours"": 40,
-                                ""requiredSkills"": [
-                                    {
-                                        ""skillName"": ""[Kỹ năng]"",
-                                        ""requiredLevel"": 3,
-                                        ""importance"": 2
-                                    }
-                                ]
-                            }
-                        ]
+                          ]
+                        }
+                      ]
                     }
-                    **LƯU Ý QUAN TRỌNG:**
-                    - LUÔN LUÔN bao gồm estimatedHours (ước tính hợp lý)
-                    - LUÔN LUÔN bao gồm requiredSkills (ít nhất 1 skill cho mỗi task)
-                    - requiredSkills phải dựa trên mô tả công việc, KHÔNG bịa đặt
-                    - Nếu không chắc chắn về skill → dùng level 3, importance 2
                     ",
 
                     _ => "Trả lời tự nhiên, dễ hiểu",

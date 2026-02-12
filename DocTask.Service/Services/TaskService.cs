@@ -42,6 +42,10 @@ public class TaskService : ITaskService
 
     public async Task<TaskDto?> CreateTaskAsync(CreateTaskDto taskDto, int userId)
     {
+        // Kiểm tra null cho StartDate và DueDate
+        if (!taskDto.StartDate.HasValue || !taskDto.DueDate.HasValue)
+            throw new BadRequestException("StartDate and DueDate are required.");
+
         if (taskDto.StartDate.Value.Day < DateTime.Now.Day || taskDto.StartDate > taskDto.DueDate)
             throw new BadRequestException("StartDate must be earlier than or equal to DueDate.");
 
@@ -108,6 +112,9 @@ public class TaskService : ITaskService
 
         // Trả về DTO
         var taskWithUsers = await _taskRepository.GetTaskByIdAsync(created.TaskId);
+        if (taskWithUsers == null)
+            throw new InternalServerErrorException("Không thể lấy thông tin task vừa tạo.");
+        
         return taskWithUsers.ToTaskDto();
     }
 
@@ -127,11 +134,18 @@ public class TaskService : ITaskService
         }
 
         var taskWithRelations = await _taskRepository.GetByIdWithUsersAndUnitsAsync(taskId);
+        if (taskWithRelations == null)
+            throw new InternalServerErrorException("Không thể lấy thông tin task.");
+        
         return taskWithRelations.ToTaskDto();
     }
 
     public async Task<TaskDto> UpdateTaskAsync(int taskId, UpdateTaskDto taskDto, int userId)
     {
+        // Kiểm tra null cho StartDate và DueDate
+        if (!taskDto.StartDate.HasValue || !taskDto.DueDate.HasValue)
+            throw new BadRequestException("StartDate and DueDate are required.");
+
         if (taskDto.StartDate.Value.Day < DateTime.Now.Day || taskDto.StartDate > taskDto.DueDate)
             throw new BadRequestException("StartDate must be earlier than or equal to DueDate.");
 
@@ -150,8 +164,8 @@ public class TaskService : ITaskService
             throw new InternalServerErrorException("Cập nhật task thất bại.");
         }
 
-        // kiểm tra task được giao ở db
-        var hasAssignees = existingTask.Users.Any() || existingTask.Taskunitassignments.Any();
+        // Kiểm tra task được giao ở db (kiểm tra null cho collections)
+        var hasAssignees = (existingTask.Users?.Any() ?? false) || (existingTask.Taskunitassignments?.Any() ?? false);
 
         if (hasAssignees)
         {
@@ -214,8 +228,13 @@ public class TaskService : ITaskService
         if (foundUser == null)
             throw new NotFoundException("Invalid user");
 
-        if (foundUser.UnitUser.Level > 1)
+        // Kiểm tra null cho UnitUser trước khi truy cập Level
+        if (foundUser.UnitUser == null || foundUser.UnitUser.Level > 1)
             return result;
+
+        // Kiểm tra null cho UnitId trước khi truy cập .Value
+        if (!foundUser.UnitId.HasValue)
+            throw new BadRequestException("User không có UnitId.");
 
         var foundUnit = await _unitRepository.GetUnitByIdAsync(foundUser.UnitId.Value);
         if (foundUnit == null)
@@ -339,8 +358,16 @@ public class TaskService : ITaskService
     }
     private bool ValidateAssignedUsers(List<int> assignedUsers, AssignableUsersResponseDto assignableUsers)
     {
-        var peerIds = assignableUsers.peers.Select(p => p.UserId).ToList();
-        var surbodinateIds = assignableUsers.subordinates.Select(p => p.UserId).ToList();
+        // Kiểm tra null cho input parameters
+        if (assignedUsers == null || !assignedUsers.Any())
+            return true; // Không có user nào để validate
+
+        if (assignableUsers == null)
+            return false;
+
+        // Kiểm tra null cho collections trước khi Select
+        var peerIds = assignableUsers.peers?.Select(p => p.UserId).ToList() ?? new List<int>();
+        var surbodinateIds = assignableUsers.subordinates?.Select(p => p.UserId).ToList() ?? new List<int>();
         var assignableIds = peerIds.Concat(surbodinateIds).ToList();
 
         foreach (var i in assignedUsers)
@@ -354,8 +381,16 @@ public class TaskService : ITaskService
 
     private bool ValidateAssignedUnits(List<int> assignedUnits, AssignableUnitsResponseDto assignableUsers)
     {
-        var peerIds = assignableUsers.peers.Select(p => p.UnitId).ToList();
-        var surbodinateIds = assignableUsers.surbodinates.Select(p => p.UnitId).ToList();
+        // Kiểm tra null cho input parameters
+        if (assignedUnits == null || !assignedUnits.Any())
+            return true; // Không có unit nào để validate
+
+        if (assignableUsers == null)
+            return false;
+
+        // Kiểm tra null cho collections trước khi Select
+        var peerIds = assignableUsers.peers?.Select(p => p.UnitId).ToList() ?? new List<int>();
+        var surbodinateIds = assignableUsers.surbodinates?.Select(p => p.UnitId).ToList() ?? new List<int>();
         var assignableIds = peerIds.Concat(surbodinateIds).ToList();
 
         foreach (var i in assignedUnits)

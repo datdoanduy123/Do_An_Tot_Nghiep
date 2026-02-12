@@ -26,65 +26,109 @@ namespace DocTask.Service.Services
 
         public async Task<int> CreateDraftFromGeminiAsync(object geminiTaskData, int fileId, int userId)
         {
-            // 1. Parsing Data từ AI
-            GeminiDto.GeminiTaskDto aiTask;
-            if (geminiTaskData is JsonElement jsonElement)
+            try
             {
-                aiTask = JsonSerializer.Deserialize<GeminiDto.GeminiTaskDto>(jsonElement.GetRawText())
-                         ?? throw new System.Exception("Failed to deserialize AI task data");
-            }
-            else if (geminiTaskData is GeminiDto.GeminiTaskDto dto)
-            {
-                aiTask = dto;
-            }
-            else
-            {
-                var json = JsonSerializer.Serialize(geminiTaskData);
-                aiTask = JsonSerializer.Deserialize<GeminiDto.GeminiTaskDto>(json)
-                         ?? throw new System.Exception("Invalid AI task data format");
-            }
-            // 2. Tạo Root Draft
-            var rootDraft = new TaskDraft
-            {
-                FileId = fileId,
-                CreatedBy = userId,
-                Title = aiTask.Title,
-                Description = aiTask.Description,
-                StartDate = aiTask.StartDate,
-                EndDate = aiTask.EndDate,
-                EstimatedHours = aiTask.EstimatedHours,
-                RawAIResponse = JsonSerializer.Serialize(aiTask),
-                Status = "Pending",
-                ParentDraftId = null
-            };
-            await _draftRepository.CreateAsync(rootDraft);
-
-            // 3. Lưu Skill cho Root Task
-            await SaveDraftSkillsAsync(rootDraft.DraftId, aiTask.RequiredSkills);
-            // 4. Tạo Subtasks (Recursive 1 cấp)
-            if (aiTask.Subtasks != null)
-            {
-                foreach (var subDt in aiTask.Subtasks)
+                // 1. Parsing Data từ AI
+                GeminiDto.GeminiTaskDto aiTask;
+                if (geminiTaskData is JsonElement jsonElement)
                 {
-                    var subDraft = new TaskDraft
-                    {
-                        FileId = fileId,
-                        CreatedBy = userId,
-                        Title = subDt.Title,
-                        Description = subDt.Description,
-                        StartDate = subDt.StartDate,
-                        EndDate = subDt.DueDate,
-                        EstimatedHours = subDt.EstimatedHours,
-                        ParentDraftId = rootDraft.DraftId,
-                        Status = "Pending"
-                    };
-                    await _draftRepository.CreateAsync(subDraft);
-
-                    // Lưu Skill cho Subtask
-                    await SaveDraftSkillsAsync(subDraft.DraftId, subDt.RequiredSkills);
+                    aiTask = JsonSerializer.Deserialize<GeminiDto.GeminiTaskDto>(jsonElement.GetRawText())
+                             ?? throw new System.Exception("Failed to deserialize AI task data");
                 }
+                else if (geminiTaskData is GeminiDto.GeminiTaskDto dto)
+                {
+                    aiTask = dto;
+                }
+                else
+                {
+                    var json = JsonSerializer.Serialize(geminiTaskData);
+                    aiTask = JsonSerializer.Deserialize<GeminiDto.GeminiTaskDto>(json)
+                             ?? throw new System.Exception("Invalid AI task data format");
+                }
+                
+                // 2. Tạo Root Draft
+                var rootDraft = new TaskDraft
+                {
+                    FileId = fileId,
+                    CreatedBy = userId,
+                    Title = aiTask.Title,
+                    Description = aiTask.Description,
+                    StartDate = aiTask.StartDate,
+                    EndDate = aiTask.EndDate,
+                    EstimatedHours = aiTask.EstimatedHours,
+                    RawAIResponse = JsonSerializer.Serialize(aiTask),
+                    Status = "Pending",
+                    ParentDraftId = null
+                };
+                
+                await _draftRepository.CreateAsync(rootDraft);
+                Console.WriteLine($"✅ Created root draft with ID: {rootDraft.DraftId}");
+
+                // 3. Lưu Skill cho Root Task
+                try 
+                {
+                    await SaveDraftSkillsAsync(rootDraft.DraftId, aiTask.RequiredSkills);
+                    Console.WriteLine($"✅ Saved {aiTask.RequiredSkills?.Count ?? 0} skills for root draft");
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"⚠️ Error saving root draft skills: {ex.Message}");
+                    // Continue anyway - skills are optional
+                }
+
+                // 4. Tạo Subtasks (Recursive 1 cấp)
+                if (aiTask.Subtasks != null)
+                {
+                    Console.WriteLine($"📝 Creating {aiTask.Subtasks.Count} subtasks...");
+                    int subtaskCount = 0;
+                    foreach (var subDt in aiTask.Subtasks)
+                    {
+                        try
+                        {
+                            var subDraft = new TaskDraft
+                            {
+                                FileId = fileId,
+                                CreatedBy = userId,
+                                Title = subDt.Title,
+                                Description = subDt.Description,
+                                StartDate = subDt.StartDate,
+                                EndDate = subDt.DueDate,
+                                EstimatedHours = subDt.EstimatedHours,
+                                ParentDraftId = rootDraft.DraftId,
+                                Status = "Pending"
+                            };
+                            await _draftRepository.CreateAsync(subDraft);
+                            subtaskCount++;
+
+                            // Lưu Skill cho Subtask
+                            try
+                            {
+                                await SaveDraftSkillsAsync(subDraft.DraftId, subDt.RequiredSkills);
+                            }
+                            catch (Exception skillEx)
+                            {
+                                Console.WriteLine($"⚠️ Error saving skills for subtask {subDraft.DraftId}: {skillEx.Message}");
+                            }
+                        }
+                        catch (Exception subEx)
+                        {
+                            Console.WriteLine($"❌ Error creating subtask: {subEx.Message}");
+                            // Continue với subtask khác
+                        }
+                    }
+                    Console.WriteLine($"✅ Created {subtaskCount}/{aiTask.Subtasks.Count} subtasks");
+                }
+
+                Console.WriteLine($"🎉 Draft creation completed! Returning draftId: {rootDraft.DraftId}");
+                return rootDraft.DraftId;
             }
-            return rootDraft.DraftId;
+            catch (Exception ex)
+            {
+                Console.WriteLine($"❌❌❌ CRITICAL ERROR in CreateDraftFromGeminiAsync: {ex.Message}");
+                Console.WriteLine($"Stack trace: {ex.StackTrace}");
+                // Return -1 để indicate lỗi
+                return -1;
+            }
         }
         private async Task SaveDraftSkillsAsync(int draftId, List<GeminiDto.GeminiSkillRequirementDTO> skillDtos)
         {

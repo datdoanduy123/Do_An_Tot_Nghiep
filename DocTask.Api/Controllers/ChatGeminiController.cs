@@ -40,32 +40,28 @@ namespace DocTask.Api.Controllers
             return Content(response.ToString(), "text/plain");
         }
         [HttpPost("generate-tasks/{fileId}")]
-        [SwaggerOperation(Summary = "Tạo một kế hoạch công việc mới sử dụng Gemini")]
+        [SwaggerOperation(Summary = "Tạo một kế hoạch công việc mới sử dụng Gemini (Lưu bản nháp)")]
         public async Task<IActionResult> PostWithFile(int fileId, [FromQuery] bool redo = false)
         {
             try
             {
-                // Truyền tham số redo xuống service
-                var response = await _geminiService.AskWithFileAsync(fileId, redo);
-
-                object data;
-
-                // Kiểm tra xem response có phải JSON hay không
-                if (!string.IsNullOrWhiteSpace(response.Response) &&
-                    (response.Response.TrimStart().StartsWith("{") || response.Response.TrimStart().StartsWith("[")))
+                // Lấy userId từ JWT Claims
+                var userIdString = User.FindFirst("id")?.Value;
+                if (string.IsNullOrEmpty(userIdString) || !int.TryParse(userIdString, out int userId))
                 {
-                    using var doc = JsonDocument.Parse(response.Response);
-                    data = doc.RootElement.Clone(); // clone để dùng ngoài using
+                    return Unauthorized(new { error = "User not authenticated" });
                 }
-                else
-                {
-                    return BadRequest(new { error = "Response from Gemini is not valid JSON" });
-                }
+
+                // Truyền tham số redo và userId xuống service
+                var response = await _geminiService.AskWithFileAsync(fileId, userId, redo);
 
                 var apiResponse = new ApiResponse<object>
                 {
                     Success = true,
-                    Data = data,
+                    Data = new { 
+                        draftId = response.DraftId,
+                        message = "Đã tạo bản nháp thành công. Vui lòng kiểm tra trong danh sách bản nháp."
+                    },
                     Message = "Tạo kế hoạch công việc thành công"
                 };
 
@@ -129,15 +125,51 @@ namespace DocTask.Api.Controllers
             object data;
 
             // Nếu response là JSON, parse thành JsonElement
-            if (!string.IsNullOrWhiteSpace(preview.Response) &&
-                (preview.Response.TrimStart().StartsWith("{") || preview.Response.TrimStart().StartsWith("[")))
+            var jsonResponse = preview.Response?.Trim();
+
+            if (!string.IsNullOrEmpty(jsonResponse))
             {
-                using var doc = JsonDocument.Parse(preview.Response);
-                data = doc.RootElement.Clone(); // clone để dùng ngoài using
+                // Remove Markdown code blocks if present
+                if (jsonResponse.StartsWith("```json"))
+                {
+                    jsonResponse = jsonResponse.Substring(7);
+                    if (jsonResponse.EndsWith("```"))
+                    {
+                        jsonResponse = jsonResponse.Substring(0, jsonResponse.Length - 3);
+                    }
+                }
+                else if (jsonResponse.StartsWith("```"))
+                {
+                     jsonResponse = jsonResponse.Substring(3);
+                     if (jsonResponse.EndsWith("```"))
+                     {
+                         jsonResponse = jsonResponse.Substring(0, jsonResponse.Length - 3);
+                     }
+                }
+
+                jsonResponse = jsonResponse.Trim();
+
+                if (jsonResponse.StartsWith("{") || jsonResponse.StartsWith("["))
+                {
+                     try
+                     {
+                        using var doc = JsonDocument.Parse(jsonResponse);
+                        data = doc.RootElement.Clone();
+                     }
+                     catch
+                     {
+                        // Fallback in case parsing fails even after cleanup
+                         data = preview.Response; 
+                     }
+                }
+                else
+                {
+                    data = preview.Response;
+                }
             }
             else
             {
-                data = preview.Response ?? string.Empty;
+                data = string.Empty;
             }
 
             var apiResponse = new ApiResponse<object>
