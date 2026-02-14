@@ -14,13 +14,13 @@ using DocTask.Core.Dtos.Tasks;
 using DocTask.Core.Interfaces.Repositories;
 using DocTask.Core.Interfaces.Services;
 using DocTask.Service.Helpers;
-
+using DocTask.Service.Services.Providers;
+using static DocTask.Core.Dtos.Gemini.AiProviderDto;
 namespace DocTask.Service.Services
 {
     public class AutomationService : IAutomationService
     {
-        private readonly HttpClient _httpClient;
-        private readonly string _geminiApiKey;
+        private readonly AiProviderFactory _aiProviderFactory;
         private readonly IUploadFileRepository _uploadFileRepository;
         private readonly ITaskService _taskService;
         private readonly ISubTaskService _subTaskService;
@@ -33,9 +33,13 @@ namespace DocTask.Service.Services
             PropertyNameCaseInsensitive = true,
             NumberHandling = JsonNumberHandling.AllowReadingFromString,
         };
+
+        /// <summary>
+        /// Constructor — inject AiProviderFactory thay vì HttpClient.
+        /// Factory tự động xử lý fallback: Ollama → Gemini → Rule-based.
+        /// </summary>
         public AutomationService(
-            HttpClient httpClient,
-            GeminiDto.GeminiOptions options,
+            AiProviderFactory aiProviderFactory,
             IUploadFileRepository uploadFileRepository,
             IUploadFileService uploadFileService,
             ITaskRepository taskRepository,
@@ -46,8 +50,7 @@ namespace DocTask.Service.Services
             IAgentRepository agentRepository
         )
         {
-            _httpClient = httpClient;
-            _geminiApiKey = options.ApiKey;
+            _aiProviderFactory = aiProviderFactory;
             _uploadFileRepository = uploadFileRepository;
             _taskService = taskService;
             _subTaskService = subTaskService;
@@ -67,97 +70,51 @@ namespace DocTask.Service.Services
                 ? "No explicit user prompt provided. Derive actions from document context only."
                 : request.Prompt.Trim();
 
-            var requestBody = new
+            // ===== Xây dựng messages cho AI =====
+            var messages = new List<AiMessage>
             {
-                contents = new List<object>
-                {
-                    new
-                    {
-                        role = "user",
-                        parts = new object[]
-                        {
-                            new
-                            {
-                                text = PromptHelper.Clean(systemPrompt)
-                            }
-                        }
-                    },
-                    new
-                    {
-                        role = "user",
-                        parts = new object[]
-                        {
-                            new
-                            {
-                                text = PromptHelper.Clean(trimmedPrompt)
-                            }
-                        }
-                    }
-                },
-                generationConfig = new
-                {
-                    temperature = 0,
-                    candidateCount = 1,
-                    topP = 0.8,
-                    topK = 40,
-                    maxOutputTokens = 4096,
-                }
+                new AiMessage { Role = "system", Content = PromptHelper.Clean(systemPrompt) },
+                new AiMessage { Role = "user", Content = PromptHelper.Clean(trimmedPrompt) }
             };
 
+            // Thêm file context (chia thành chunks nếu quá dài)
             if (!string.IsNullOrWhiteSpace(aggregatedContext))
             {
                 var chunks = SplitIntoChunks(aggregatedContext, FileContextChunkSize);
                 for (int i = 0; i < chunks.Count; i++)
                 {
-                    requestBody.contents.Add(new
+                    messages.Add(new AiMessage
                     {
-                        role = "user",
-                        parts = new object[]
-                        {
-                            new
-                            {
-                                text = PromptHelper.Clean($"Document context chunk {i + 1}/{chunks.Count}:\n{chunks[i]}")
-                            }
-                        }
+                        Role = "user",
+                        Content = PromptHelper.Clean($"Document context chunk {i + 1}/{chunks.Count}:\n{chunks[i]}")
                     });
                 }
             }
             else
             {
-                requestBody.contents.Add(new
+                messages.Add(new AiMessage
                 {
-                    role = "user",
-                    parts = new object[]
-                    {
-                        new
-                        {
-                            text = PromptHelper.Clean("No document context supplied.")
-                        }
-                    }
+                    Role = "user",
+                    Content = PromptHelper.Clean("No document context supplied.")
                 });
             }
 
-            var url = $"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={_geminiApiKey}";
-
-            var httpResponse = await _httpClient.PostAsJsonAsync(url, requestBody);
-            var raw = await httpResponse.Content.ReadAsStringAsync();
-            httpResponse.EnsureSuccessStatusCode();
-
-            using var doc = JsonDocument.Parse(raw);
-            var response = doc.RootElement
-                .GetProperty("candidates")[0]
-                .GetProperty("content")
-                .GetProperty("parts")[0]
-                .GetProperty("text")
-                .GetString();
-
-            var candidateJson = ExtractJsonArray(response);
-            if (string.IsNullOrWhiteSpace(candidateJson) || candidateJson.TrimStart()[0] != '[' || candidateJson.TrimEnd()[^1] != ']')
+            // ===== Gọi AI qua factory (tự động fallback) =====
+            var aiRequest = new AiCompletionRequest
             {
-                throw new InvalidOperationException("AI output is not a valid JSON array.");
-            }
-            
-            Console.WriteLine("Raw Response:\n" + response);
+                Messages = messages,
+                Temperature = 0.0,
+                MaxOutputTokens = 4096,
+                TopP = 0.8
+            };
+
+            var aiResponse = await _aiProviderFactory.CompleteAsync(aiRequest);
+            var response = aiResponse.Text;
+
+            Console.WriteLine($"Raw Response (via {aiResponse.ProviderUsed}):\n" + response);
+
+            // ===== Parse JSON response =====
+            var candidateJson = ExtractJsonArray(response);
             List<CreateTaskAutomationDto>? tasks;
             try
             {

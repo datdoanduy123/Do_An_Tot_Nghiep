@@ -4,12 +4,19 @@ using DocTask.Core.Dtos.Users;
 using DocTask.Core.Exceptions;
 using DocTask.Core.Interfaces.Repositories;
 using DocTask.Core.Interfaces.Services;
+using DocTask.Core.Models;
 using DocTask.Core.Paginations;
+using DocTask.Data;
 using DocTask.Service.Mappers;
+using Microsoft.EntityFrameworkCore;
+using Task = System.Threading.Tasks.Task;
 using TaskModel = DocTask.Core.Models.Task;
 
 namespace DocTask.Service.Services;
 
+/// <summary>
+/// Service quản lý Task: CRUD + Assign + Auto-assign + Schedule generation.
+/// </summary>
 public class TaskService : ITaskService
 {
     private readonly ITaskRepository _taskRepository;
@@ -18,8 +25,16 @@ public class TaskService : ITaskService
     private readonly IUnitRepository _unitRepository;
     private readonly IReminderService _reminderService;
     private readonly IReminderRepository _reminderRepository;
+    private readonly ApplicationDbContext _dbContext;
 
-    public TaskService(ITaskRepository taskRepository, ISubTaskRepository subTaskRepository, IUserRepository userRepository, IUnitRepository unitRepository, IReminderService reminderService, IReminderRepository reminderRepository)
+    public TaskService(
+        ITaskRepository taskRepository,
+        ISubTaskRepository subTaskRepository,
+        IUserRepository userRepository,
+        IUnitRepository unitRepository,
+        IReminderService reminderService,
+        IReminderRepository reminderRepository,
+        ApplicationDbContext dbContext)
     {
         _taskRepository = taskRepository;
         _subTaskRepository = subTaskRepository;
@@ -27,6 +42,7 @@ public class TaskService : ITaskService
         _unitRepository = unitRepository;
         _reminderService = reminderService;
         _reminderRepository = reminderRepository;
+        _dbContext = dbContext;
     }
 
     public async Task<PaginatedList<TaskDto>> GetAll(PageOptionsRequest pageOptions, string? key, int userId)
@@ -405,5 +421,275 @@ public class TaskService : ITaskService
     {
         await _subTaskRepository.AssignUsersToTaskAsync(taskId, userIds);
     }
-    
+
+    // ================================================================
+    //  MANUAL ASSIGN — Gán user/unit thủ công
+    // ================================================================
+
+    /// <summary>
+    /// Gán user/unit cho task thủ công.
+    /// PATCH semantics: null = không đổi, [] = clear.
+    /// </summary>
+    public async Task<TaskDto> ManualAssignAsync(int taskId, AssignTaskRequest request, int userId)
+    {
+        var task = await _taskRepository.GetTaskByIdAsync(taskId);
+        if (task == null)
+            throw new NotFoundException($"Task {taskId} không tồn tại.");
+
+        // Chỉ assigner mới được gán
+        if (task.AssignerId != userId)
+            throw new UnauthorizedException("Bạn không có quyền gán người cho task này.");
+
+        // PATCH: UserIds
+        if (request.UserIds != null)
+        {
+            // Xóa assignments cũ rồi gán mới
+            var existingUsers = task.Users?.ToList() ?? new List<User>();
+            foreach (var u in existingUsers)
+            {
+                task.Users!.Remove(u);
+            }
+            await _dbContext.SaveChangesAsync();
+
+            // Gán mới (nếu list không rỗng)
+            if (request.UserIds.Any())
+            {
+                await _taskRepository.AssignUsersToTaskAsync(taskId, request.UserIds);
+            }
+        }
+
+        // PATCH: UnitIds
+        if (request.UnitIds != null)
+        {
+            // Xóa assignments cũ
+            var existingUnits = await _dbContext.Taskunitassignments
+                .Where(t => t.TaskId == taskId)
+                .ToListAsync();
+            _dbContext.Taskunitassignments.RemoveRange(existingUnits);
+            await _dbContext.SaveChangesAsync();
+
+            // Gán mới
+            if (request.UnitIds.Any())
+            {
+                await _taskRepository.AssignUnitsToTaskAsync(taskId, request.UnitIds);
+            }
+        }
+
+        // Tạo reminder thông báo
+        var updatedTask = await _taskRepository.GetByIdWithUsersAndUnitsAsync(taskId);
+        if (updatedTask != null)
+        {
+            await CreateAssignmentRemindersAsync(updatedTask);
+        }
+
+        Console.WriteLine($"✅ Manual assign task {taskId}: Users={request.UserIds?.Count ?? 0}, Units={request.UnitIds?.Count ?? 0}");
+
+        var result = await _taskRepository.GetByIdWithUsersAndUnitsAsync(taskId);
+        return result!.ToTaskDto();
+    }
+
+    // ================================================================
+    //  AUTO ASSIGN — Rule-based scoring (không dùng K-means trực tiếp)
+    // ================================================================
+
+    /// <summary>
+    /// Tự động gợi ý + gán người dựa trên rule-based scoring.
+    /// Công thức: score = Σ(match * importance * level) - workload_penalty
+    /// - match = 1 nếu user có skill, 0 nếu không
+    /// - importance = 1-3 (độ quan trọng skill trong task)
+    /// - level = min(userLevel, requiredLevel) / requiredLevel (tỷ lệ đáp ứng)
+    /// - workload = số task đang active / 10 (penalty % overload)
+    /// Chọn top 3 users có score cao nhất.
+    /// </summary>
+    public async Task<TaskDto> AutoAssignByScoreAsync(int taskId, int userId)
+    {
+        var task = await _taskRepository.GetTaskByIdAsync(taskId);
+        if (task == null)
+            throw new NotFoundException($"Task {taskId} không tồn tại.");
+
+        if (task.AssignerId != userId)
+            throw new UnauthorizedException("Bạn không có quyền auto-assign task này.");
+
+        // 1. Lấy danh sách skills yêu cầu của task
+        var requiredSkills = await _dbContext.TaskSkillRequirements
+            .Where(ts => ts.TaskId == taskId)
+            .ToListAsync();
+
+        if (!requiredSkills.Any())
+            throw new BadRequestException("Task chưa có skills yêu cầu. Hãy thêm skills trước khi auto-assign.");
+
+        // 2. Lấy tất cả users có skill phù hợp
+        var requiredSkillIds = requiredSkills.Select(s => s.SkillId).ToList();
+
+        var candidateUserSkills = await _dbContext.UserSkills
+            .Include(us => us.User)
+            .Where(us => requiredSkillIds.Contains(us.SkillId))
+            .ToListAsync();
+
+        if (!candidateUserSkills.Any())
+            throw new BadRequestException("Không tìm thấy nhân viên nào có skill phù hợp.");
+
+        // 3. Tính score cho mỗi user
+        var userScores = candidateUserSkills
+            .GroupBy(us => us.UserId)
+            .Select(group =>
+            {
+                var userSkills = group.ToList();
+                double score = 0;
+
+                foreach (var req in requiredSkills)
+                {
+                    var userSkill = userSkills.FirstOrDefault(s => s.SkillId == req.SkillId);
+                    if (userSkill != null)
+                    {
+                        // Tỷ lệ đáp ứng = min(userLevel, reqLevel) / reqLevel  
+                        double levelRatio = req.RequiredLevel > 0
+                            ? Math.Min(userSkill.ProficiencyLevel, req.RequiredLevel) / (double)req.RequiredLevel
+                            : 1.0;
+
+                        // Score += match * importance * levelRatio
+                        score += 1.0 * req.Importance * levelRatio;
+                    }
+                }
+
+                return new { UserId = group.Key, UserName = group.First().User?.FullName, Score = score };
+            })
+            .OrderByDescending(x => x.Score)
+            .ToList();
+
+        // 4. Tính workload penalty (số task đang active)
+        var scoredWithWorkload = new List<(int UserId, string? UserName, double FinalScore)>();
+
+        foreach (var candidate in userScores)
+        {
+            var activeTaskCount = await _dbContext.Tasks
+                .CountAsync(t => t.AssigneeId == candidate.UserId
+                    && t.Status != "Completed"
+                    && t.Status != "Cancelled"
+                    && (t.IsDeleted == null || t.IsDeleted == false));
+
+            // Workload penalty: mỗi 10 task giảm 1 điểm
+            double penalty = activeTaskCount / 10.0;
+            double finalScore = candidate.Score - penalty;
+
+            scoredWithWorkload.Add((candidate.UserId, candidate.UserName, finalScore));
+        }
+
+        // 5. Chọn top 3
+        var topUsers = scoredWithWorkload
+            .OrderByDescending(x => x.FinalScore)
+            .Take(3)
+            .ToList();
+
+        if (!topUsers.Any())
+            throw new BadRequestException("Không tìm thấy ứng viên phù hợp.");
+
+        // 6. Gán
+        var topUserIds = topUsers.Select(u => u.UserId).ToList();
+        await _taskRepository.AssignUsersToTaskAsync(taskId, topUserIds);
+
+        // 7. Đánh dấu IsAutoAssigned
+        task.IsAutoAssigned = true;
+        _dbContext.Tasks.Update(task);
+        await _dbContext.SaveChangesAsync();
+
+        Console.WriteLine($"✅ Auto-assign task {taskId}: {string.Join(", ", topUsers.Select(u => $"{u.UserName}({u.FinalScore:F1})"))}");
+
+        // 8. Gửi reminder
+        var updatedTask = await _taskRepository.GetByIdWithUsersAndUnitsAsync(taskId);
+        if (updatedTask != null)
+            await CreateAssignmentRemindersAsync(updatedTask);
+
+        var result = await _taskRepository.GetByIdWithUsersAndUnitsAsync(taskId);
+        return result!.ToTaskDto();
+    }
+
+    // ================================================================
+    //  GENERATE SCHEDULE — Sinh lịch nhắc theo tần suất
+    // ================================================================
+
+    /// <summary>
+    /// Sinh batch reminders từ StartDate → DueDate theo tần suất.
+    /// - weekly: mỗi tuần tạo 1 reminder (vào thứ Hai)
+    /// - monthly: mỗi tháng 1 reminder (ngày 1)
+    /// - daily: mỗi ngày 1 reminder
+    /// Trả về số reminders đã tạo.
+    /// </summary>
+    public async Task<int> GenerateScheduleAsync(int taskId, string frequency, int userId)
+    {
+        var task = await _taskRepository.GetTaskByIdAsync(taskId);
+        if (task == null)
+            throw new NotFoundException($"Task {taskId} không tồn tại.");
+
+        if (!task.StartDate.HasValue || !task.DueDate.HasValue)
+            throw new BadRequestException("Task chưa có StartDate/DueDate. Vui lòng cập nhật trước.");
+
+        var start = task.StartDate.Value;
+        var end = task.DueDate.Value;
+
+        // Tạo danh sách trigger dates
+        var triggerDates = new List<DateTime>();
+        var current = start;
+
+        switch (frequency.ToLower())
+        {
+            case "daily":
+                while (current <= end)
+                {
+                    triggerDates.Add(current);
+                    current = current.AddDays(1);
+                }
+                break;
+
+            case "weekly":
+                // Nhảy đến thứ 2 đầu tiên
+                while (current.DayOfWeek != DayOfWeek.Monday)
+                    current = current.AddDays(1);
+                while (current <= end)
+                {
+                    triggerDates.Add(current);
+                    current = current.AddDays(7);
+                }
+                break;
+
+            case "monthly":
+                // Mỗi tháng vào ngày 1
+                current = new DateTime(current.Year, current.Month, 1);
+                if (current < start) current = current.AddMonths(1);
+                while (current <= end)
+                {
+                    triggerDates.Add(current);
+                    current = current.AddMonths(1);
+                }
+                break;
+
+            default:
+                throw new BadRequestException($"Frequency '{frequency}' không hợp lệ. Chọn: daily, weekly, monthly.");
+        }
+
+        // Tạo batch reminders
+        int count = 0;
+        foreach (var triggerDate in triggerDates)
+        {
+            var reminder = new Reminder
+            {
+                Taskid = taskId,
+                Title = $"Nhắc nhở: {task.Title}",
+                Message = $"Deadline báo cáo tiến độ: {triggerDate:dd/MM/yyyy}",
+                Triggertime = triggerDate,
+                Isauto = true,
+                Createdby = userId,
+                Createdat = DateTime.UtcNow,
+                Isnotified = false,
+                IsRead = false
+            };
+            _dbContext.Reminders.Add(reminder);
+            count++;
+        }
+
+        await _dbContext.SaveChangesAsync();
+        Console.WriteLine($"📅 Generated {count} {frequency} reminders for task {taskId}");
+
+        return count;
+    }
 }

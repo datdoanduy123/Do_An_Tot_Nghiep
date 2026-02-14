@@ -92,11 +92,16 @@ builder.Services.AddSingleton<Cloudinary>(sp =>
     return new Cloudinary(account);
 });
 
-// Configuration GeminiAI
-builder.Services.AddSingleton(new GeminiDto.GeminiOptions
+// Configuration AI Providers (Ollama local + Gemini cloud fallback)
+var aiProviderOptions = new DocTask.Core.Dtos.Gemini.AiProviderDto.AiProviderOptions
 {
-  ApiKey = Environment.GetEnvironmentVariable("GEMINI_API_KEY") ?? ""
-});
+    // Ollama local server (primary) — chạy tại localhost
+    OllamaBaseUrl = Environment.GetEnvironmentVariable("OLLAMA_BASE_URL") ?? "http://localhost:11434",
+    OllamaModel = Environment.GetEnvironmentVariable("OLLAMA_MODEL") ?? "qwen2.5:7b-instruct",
+    // Gemini cloud API (fallback) — dùng khi Ollama không khả dụng
+    GeminiApiKey = Environment.GetEnvironmentVariable("GEMINI_API_KEY") ?? ""
+};
+builder.Services.AddSingleton(aiProviderOptions);
 
 
 builder.Services.AddControllerConfiguration();

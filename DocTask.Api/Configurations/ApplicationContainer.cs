@@ -2,7 +2,9 @@ using DocTask.Core.Interfaces.Repositories;
 using DocTask.Core.Interfaces.Services;
 using DocTask.Data.Repositories;
 using DocTask.Service.Services;
+using DocTask.Service.Services.Providers;
 using Microsoft.AspNetCore.SignalR;
+using static DocTask.Core.Dtos.Gemini.AiProviderDto;
 
 namespace DockTask.Api.Configurations
 {
@@ -10,7 +12,29 @@ namespace DockTask.Api.Configurations
     {
         public static IServiceCollection AddApplicationContainer(this IServiceCollection services)
         {
-            // Services
+            // ===== AI Providers (Ollama local → Rule-based fallback) =====
+            // ⚠️ Gemini đã bị loại bỏ — chỉ dùng Ollama local (miễn phí, unlimited)
+            services.AddHttpClient("OllamaHttpClient");
+
+            // Đăng ký AiProviderFactory — trung tâm điều phối fallback
+            services.AddScoped<AiProviderFactory>(sp =>
+            {
+                var options = sp.GetRequiredService<AiProviderOptions>();
+                var httpFactory = sp.GetRequiredService<IHttpClientFactory>();
+
+                // Tạo danh sách providers theo thứ tự ưu tiên:
+                // 1. Ollama local (primary) — chạy miễn phí tại localhost
+                // 2. RuleBasedFallback — sinh task mặc định nếu Ollama lỗi
+                var providers = new List<IAiProvider>
+                {
+                    new OllamaAiProvider(httpFactory.CreateClient("OllamaHttpClient"), options),
+                    new RuleBasedFallbackProvider()
+                };
+
+                return new AiProviderFactory(providers);
+            });
+
+            // ===== Services =====
             services.AddScoped<ITaskService, TaskService>();
             services.AddScoped<IProgressService, ProgressService>();
             services.AddScoped<IProgressCalculationService, ProgressCalculationService>();
@@ -28,10 +52,10 @@ namespace DockTask.Api.Configurations
             services.AddScoped<IEmailService, EmailService>();
             services.AddScoped<IAutomationService, AutomationService>();
             services.AddScoped<IEmployeeClusteringService, EmployeeClusteringService>();
-            // Repositories section
+
+            // ===== Repositories =====
             services.AddScoped<IEmployeeProfileRepository, EmployeeProfileRepository>();
             services.AddScoped<IEmployeeClusterRepository, EmployeeClusterRepository>();
-            // Repositories
             services.AddScoped<ITaskRepository, TaskRepository>();
             services.AddScoped<IProgressRepository, ProgressRepository>();
             services.AddScoped<IReminderRepository, ReminderRepository>();
@@ -46,8 +70,6 @@ namespace DockTask.Api.Configurations
             services.AddScoped<ITaskDraftRepository, TaskDraftRepository>();
             services.AddScoped<ITaskDraftService, TaskDraftService>();
 
-            // Other
-            services.AddHttpClient<IGeminiService, GeminiService>();
             return services;
         }
     }

@@ -1,18 +1,6 @@
-using System;
-using System.Collections.Generic;
-using System.ComponentModel.Design;
 using System.Globalization;
-using System.Linq;
-using System.Net;
-using System.Net.Http.Json;
-using System.Text;
 using System.Text.Json;
-using System.Text.Json.Serialization;
-using System.Text.RegularExpressions;
-using System.Threading.Tasks;
 using DocTask.Core.Dtos.Gemini;
-using DocTask.Core.Dtos.SubTasks;
-using DocTask.Core.Dtos.Tasks;
 using DocTask.Core.Dtos.UploadFile;
 using DocTask.Core.Interfaces.Repositories;
 using DocTask.Core.Interfaces.Services;
@@ -20,18 +8,18 @@ using DocTask.Core.Models;
 using DocTask.Data;
 using DocTask.Service.Helpers;
 using DocTask.Service.Mappers;
+using DocTask.Service.Services.Providers;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
-using Microsoft.Extensions.Options;
+using static DocTask.Core.Dtos.Gemini.AiProviderDto;
 using static DocTask.Core.Dtos.Gemini.GeminiDto;
 
 namespace DocTask.Service.Services
 {
     public class GeminiService : IGeminiService
     {
-        private readonly HttpClient _httpClient;
-        private readonly string _geminiApiKey;
+        private readonly AiProviderFactory _aiProviderFactory;
         private readonly IUploadFileRepository _uploadFileRepository;
         private readonly IUploadFileService _uploadFileService;
         private readonly ITaskRepository _taskRepository;
@@ -43,9 +31,12 @@ namespace DocTask.Service.Services
         private readonly ITaskDraftService _taskDraftService;
         private const int FileContextChunkSize = 3000;
 
+        /// <summary>
+        /// Constructor — inject AiProviderFactory thay vì HttpClient trực tiếp.
+        /// Factory tự động xử lý fallback: Ollama → Gemini → Rule-based.
+        /// </summary>
         public GeminiService(
-            HttpClient httpClient,
-            GeminiDto.GeminiOptions options,
+            AiProviderFactory aiProviderFactory,
             IUploadFileRepository uploadFileRepository,
             IUploadFileService uploadFileService,
             ITaskRepository taskRepository,
@@ -57,8 +48,7 @@ namespace DocTask.Service.Services
             ITaskDraftService taskDraftService
         )
         {
-            _httpClient = httpClient;
-            _geminiApiKey = options.ApiKey;
+            _aiProviderFactory = aiProviderFactory;
             _uploadFileRepository = uploadFileRepository;
             _uploadFileService = uploadFileService;
             _taskRepository = taskRepository;
@@ -88,7 +78,82 @@ namespace DocTask.Service.Services
         // ⭐ LAYER 1: Extract project timeline bằng regex (rule-based) TRƯỚC khi gọi AI
         var (projectStartDate, projectEndDate) = TimelineExtractor.ExtractProjectTimeline(fileContent);
 
-        // Chia nội dung file thành các chunk nhỏ (~4000-5000 ký tự mỗi chunk)
+        Console.WriteLine($"[GeminiService] File Content Length: {fileContent.Length}");
+        if (fileContent.Length > 0)
+        {
+            Console.WriteLine($"[GeminiService] Preview (first 500 chars):\n{fileContent.Substring(0, Math.Min(500, fileContent.Length))}\n---END PREVIEW---");
+        }
+
+        // ⭐ LAYER 1.5: Rule-Based Template Extraction (bypass AI if modules found)
+        var projectInfo = ModuleExtractor.ExtractProjectInfo(fileContent);
+        Console.WriteLine($"[GeminiService] Extracted Modules Count: {projectInfo.Modules.Count}");
+
+        if (projectInfo.Modules.Any())
+        {
+            Console.WriteLine($"✅ [GeminiService] Detected {projectInfo.Modules.Count} modules entirely via Template.");
+            
+            var pStart = projectStartDate ?? DateTime.Now;
+            var pEnd = projectEndDate ?? DateTime.Now.AddDays(30);
+
+            var aiTask = new GeminiTaskDto
+            {
+                Title = !string.IsNullOrWhiteSpace(projectInfo.Title) ? projectInfo.Title : "Dự án mới",
+                Description = !string.IsNullOrWhiteSpace(projectInfo.Description) ? projectInfo.Description : "Được trích xuất từ template tài liệu.",
+                StartDate = pStart,
+                EndDate = pEnd,
+                EstimatedHours = projectInfo.Modules.Sum(m => m.Hours),
+                Subtasks = new List<GeminiSubtaskDto>()
+            };
+
+            // Distribute timeline sequentially based on hours
+            var totalHours = (double)aiTask.EstimatedHours;
+            if (totalHours <= 0) totalHours = 1; // avoid div by zero
+
+            var totalDays = (pEnd - pStart).TotalDays;
+            var currentStart = pStart;
+
+            foreach (var m in projectInfo.Modules)
+            {
+                var ratio = m.Hours / totalHours;
+                var durationDays = totalDays * ratio;
+                
+                // Ensure at least 1 day
+                if (durationDays < 1) durationDays = 1;
+
+                var moduleEnd = currentStart.AddDays(durationDays);
+                if (moduleEnd > pEnd) moduleEnd = pEnd;
+
+                var geminiSubtask = new GeminiSubtaskDto
+                {
+                    Title = m.Name,
+                    Description = m.Desc,
+                    EstimatedHours = m.Hours,
+                    StartDate = currentStart,
+                    DueDate = moduleEnd,
+                    RequiredSkills = new List<GeminiSkillRequirementDTO>()
+                };
+
+                // Create Work Packages for this module
+                geminiSubtask.Subtasks = GenerateWorkPackages(m, projectInfo.TechStack, currentStart, moduleEnd);
+                
+                aiTask.Subtasks.Add(geminiSubtask);
+
+                // Next module starts when this one ends
+                currentStart = moduleEnd;
+            }
+
+            // Save Draft directly
+            var createdDraftId = await _taskDraftService.CreateDraftFromGeminiAsync(aiTask, fileId, userId);
+
+            return new ChatResponse
+            {
+                Response = $"Đã trích xuất thành công dự án \"{aiTask.Title}\" với {aiTask.Subtasks.Count} module từ tài liệu.",
+                DraftId = createdDraftId,
+                AiResponse = aiTask
+            };
+        }
+
+
         var chunks = SplitIntoChunks(fileContent, FileContextChunkSize);
 
         var additionalContext = new Dictionary<string, string>
@@ -308,6 +373,10 @@ namespace DocTask.Service.Services
             return (fileContent, fileName, contentType);
         }
 
+        /// <summary>
+        /// Gọi AI thông qua AiProviderFactory (Ollama → Gemini → Rule-based).
+        /// Build prompt từ template, gửi qua factory, parse response.
+        /// </summary>
         public async Task<object> AskAsync(
             string userMessage,
             string systemPromptTemplate,
@@ -316,7 +385,7 @@ namespace DocTask.Service.Services
             double temperature = 0.0
         )
         {
-            // Build system prompt
+            // ===== BƯỚC 1: Build system prompt từ template =====
             var systemPrompt = systemPromptTemplate
                 .Replace("{DATA_SCHEMA}", GeminiPrompts.GetDataSchema(contextType))
                 .Replace("{TASK_DESCRIPTION}", GeminiPrompts.GetTaskDescription(contextType))
@@ -329,118 +398,34 @@ namespace DocTask.Service.Services
                 systemPrompt += $"\n\n**Thông tin bổ sung:**\n{contextStr}";
             }
 
-            var requestBody = new
+            // ===== BƯỚC 2: Tạo request chuẩn cho AiProviderFactory =====
+            var aiRequest = new AiCompletionRequest
             {
-                contents = new object[]
+                Messages = new System.Collections.Generic.List<AiMessage>
                 {
-                    new
-                    {
-                        role = "user",
-                        parts = new object[] { new { text = PromptHelper.Clean(systemPrompt) } }
-                    },
-                    new
-                    {
-                        role = "user",
-                        parts = new object[] { new { text = PromptHelper.Clean(userMessage) } }
-                    },
+                    new AiMessage { Role = "system", Content = PromptHelper.Clean(systemPrompt) },
+                    new AiMessage { Role = "user", Content = PromptHelper.Clean(userMessage) }
                 },
-                generationConfig = new
-                {
-                    temperature = temperature,
-                    candidateCount = 1,
-                    topP = 0.8,
-                    topK = 40,
-                    maxOutputTokens = 8192, // Tăng từ 4096 để tránh truncate response
-                }
+                Temperature = temperature,
+                MaxOutputTokens = 8192,
+                TopP = 0.8
             };
 
-            var url = $"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={_geminiApiKey}";
+            // ===== BƯỚC 3: Gọi AI qua factory (tự động fallback) =====
+            var aiResponse = await _aiProviderFactory.CompleteAsync(aiRequest);
 
-            // Retry logic với xử lý 429 và 503
-            int maxRetries = 5;
-            int delayMs = 2000;
-            string? rawResponse = null;
+            Console.WriteLine($"==== AI Response (via {aiResponse.ProviderUsed}) ====");
+            Console.WriteLine(aiResponse.Text?.Length > 500
+                ? aiResponse.Text.Substring(0, 500) + "..."
+                : aiResponse.Text);
 
-            for (int i = 0; i < maxRetries; i++)
-            {
-                try
-                {
-                    using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(60)); // Timeout 60s
-
-                    var request = new HttpRequestMessage(HttpMethod.Post, url)
-                    {
-                        Content = JsonContent.Create(requestBody)
-                    };
-                    request.Headers.Add("User-Agent", "DocTaskAI/1.0");
-                    request.Headers.Add("Accept", "application/json");
-
-                    var response = await _httpClient.SendAsync(request, cts.Token);
-                    rawResponse = await response.Content.ReadAsStringAsync();
-
-                    // Xử lý lỗi 429 - Too Many Requests (Rate Limit)
-                    if (response.StatusCode == (HttpStatusCode)429)
-                    {
-                        Console.WriteLine($"⚠️ Gemini API Rate Limit (429) - lần {i + 1}/{maxRetries}");
-                        Console.WriteLine($"   Chờ {delayMs}ms trước khi thử lại...");
-                        await System.Threading.Tasks.Task.Delay(delayMs);
-                        delayMs *= 2; // Exponential backoff: 2s → 4s → 8s → 16s → 32s
-                        continue;
-                    }
-
-                    // Xử lý lỗi 503 - Service Unavailable
-                    if (response.StatusCode == HttpStatusCode.ServiceUnavailable)
-                    {
-                        Console.WriteLine($"⚠️ Gemini bị 503 (lần {i + 1}/{maxRetries}). Thử lại sau {delayMs}ms...");
-                        await System.Threading.Tasks.Task.Delay(delayMs);
-                        delayMs *= 2;
-                        continue;
-                    }
-
-                    // Thành công - thoát khỏi vòng lặp
-                    response.EnsureSuccessStatusCode();
-                    break;
-                }
-                catch (HttpRequestException ex)
-                {
-                    Console.WriteLine($"❌ Lỗi mạng khi gọi Gemini: {ex.Message}");
-                    if (i == maxRetries - 1) 
-                    {
-                        throw new Exception($"Không thể kết nối Gemini API sau {maxRetries} lần thử: {ex.Message}", ex);
-                    }
-                    await System.Threading.Tasks.Task.Delay(delayMs);
-                    delayMs *= 2;
-                }
-                catch (TaskCanceledException)
-                {
-                    Console.WriteLine($"⏱️ Request timeout (lần {i + 1}/{maxRetries})");
-                    if (i == maxRetries - 1)
-                    {
-                        throw new Exception($"Gemini API timeout sau {maxRetries} lần thử");
-                    }
-                    await System.Threading.Tasks.Task.Delay(delayMs);
-                    delayMs *= 2;
-                }
-            }
-
-            if (string.IsNullOrWhiteSpace(rawResponse))
-                throw new Exception("Không nhận được phản hồi từ Gemini API sau nhiều lần thử.");
-
-            Console.WriteLine("==== RAW Gemini ====");
-            Console.WriteLine(rawResponse);
-
-            // Parse response
-            using var doc = JsonDocument.Parse(rawResponse);
-            var text = doc.RootElement
-                .GetProperty("candidates")[0]
-                .GetProperty("content")
-                .GetProperty("parts")[0]
-                .GetProperty("text")
-                .GetString();
+            var text = aiResponse.Text;
 
             if (string.IsNullOrWhiteSpace(text))
                 return "No response text";
 
-            // Clean code block
+            // ===== BƯỚC 4: Clean và parse response =====
+            // Loại bỏ markdown code block nếu có
             var clean = text.Replace("```json", "")
                       .Replace("```", "")
                       .Trim();
@@ -453,7 +438,7 @@ namespace DocTask.Service.Services
                     using var parsed = JsonDocument.Parse(clean);
                     return parsed.RootElement.Clone();
                 }
-                catch { /* ignore */ }
+                catch { /* ignore, thử cách khác */ }
             }
 
             // Parse JSON escaped trong chuỗi
@@ -657,6 +642,7 @@ namespace DocTask.Service.Services
             // Convert JsonElements to DTOs
             var subtasksDto = new List<GeminiSubtaskDto>();
             var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+            var seenTitles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             
             foreach (var item in mergedSubtasks)
             {
@@ -664,6 +650,15 @@ namespace DocTask.Service.Services
                     var dto = JsonSerializer.Deserialize<GeminiSubtaskDto>(item.GetRawText(), options);
                     if (dto != null)
                     {
+                        // ⭐ Deduplicate subtasks theo title (tránh trùng khi multi-chunk)
+                        var normalizedTitle = dto.Title?.Trim() ?? "";
+                        if (seenTitles.Contains(normalizedTitle))
+                        {
+                            Console.WriteLine($"⚠️ Bỏ subtask trùng: \"{normalizedTitle}\"");
+                            continue; // Skip subtask trùng tên
+                        }
+                        seenTitles.Add(normalizedTitle);
+
                         // Deduplicate và giới hạn skill cho subtask (max 4)
                         dto.RequiredSkills = dto.RequiredSkills
                             .GroupBy(s => s.SkillName.Trim().ToLower())
@@ -727,6 +722,102 @@ namespace DocTask.Service.Services
             }
 
             return fileId.ToAgentDto();
+        }
+        // --- Helper Methods for Work Packages ---
+
+        private List<GeminiSubtaskDto> GenerateWorkPackages(DocTask.Service.Helpers.ModuleExtractor.ModuleInfo module, List<string> techStack, DateTime start, DateTime end)
+        {
+            var packages = new List<GeminiSubtaskDto>();
+            var totalHours = (decimal)module.Hours;
+            var totalDays = (end - start).TotalDays;
+            
+            // Standard phases allocation
+            var standardPkgs = new [] 
+            {
+                new { Name = "Phân tích & Thiết kế", Ratio = 0.15m },
+                new { Name = "Backend Development", Ratio = 0.40m },
+                new { Name = "Frontend Development", Ratio = 0.30m },
+                new { Name = "Testing", Ratio = 0.10m },
+                new { Name = "DevOps & Deploy", Ratio = 0.05m }
+            };
+
+            var currentPkgStart = start;
+            
+            foreach (var pkg in standardPkgs)
+            {
+                var pkgHours = totalHours * pkg.Ratio;
+                var pkgDurationDays = totalDays * (double)pkg.Ratio;
+                
+                // Ensure min duration
+                if (pkgDurationDays < 0.2) pkgDurationDays = 0.2; // Min ~2-3 hours
+                
+                var pkgEnd = currentPkgStart.AddDays(pkgDurationDays);
+                if (pkgEnd > end) pkgEnd = end;
+
+                // Adjust overlaps slightly if needed, but sequential is fine for now
+                
+                var subtask = new GeminiSubtaskDto
+                {
+                    Title = $"{pkg.Name}", // e.g. "Backend Development"
+                    Description = $"{pkg.Name} cho module {module.Name}",
+                    EstimatedHours = pkgHours,
+                    StartDate = currentPkgStart,
+                    DueDate = pkgEnd,
+                    RequiredSkills = MapSkills(pkg.Name, techStack)
+                };
+                packages.Add(subtask);
+                
+                currentPkgStart = pkgEnd; 
+            }
+            
+            return packages;
+        }
+
+        private List<GeminiSkillRequirementDTO> MapSkills(string pkgName, List<string> techStack)
+        {
+            var skills = new List<GeminiSkillRequirementDTO>();
+            var stack = techStack ?? new List<string>();
+
+            if (pkgName.Contains("Backend"))
+            {
+                var keys = new[] { ".NET", "C#", "Java", "Python", "Node", "Go", "PHP", "SQL", "Entity", "Dapper" };
+                foreach(var t in stack) 
+                    if(keys.Any(k => t.IndexOf(k, StringComparison.OrdinalIgnoreCase) >= 0))
+                        skills.Add(new GeminiSkillRequirementDTO { SkillName = t, RequiredLevel = 3, Importance = 5 });
+                
+                if (!skills.Any()) skills.Add(new GeminiSkillRequirementDTO { SkillName = "C# .NET", RequiredLevel = 3, Importance = 5 });
+            }
+            else if (pkgName.Contains("Frontend"))
+            {
+                var keys = new[] { "React", "Vue", "Angular", "HTML", "CSS", "JS", "TypeScript", "Tailwind", "Bootstrap" };
+                foreach(var t in stack) 
+                    if(keys.Any(k => t.IndexOf(k, StringComparison.OrdinalIgnoreCase) >= 0))
+                        skills.Add(new GeminiSkillRequirementDTO { SkillName = t, RequiredLevel = 3, Importance = 5 });
+
+                if (!skills.Any()) skills.Add(new GeminiSkillRequirementDTO { SkillName = "ReactJS", RequiredLevel = 3, Importance = 5 });
+            }
+            else if (pkgName.Contains("Testing"))
+            {
+                 skills.Add(new GeminiSkillRequirementDTO { SkillName = "Software Testing", RequiredLevel = 3, Importance = 5 });
+                 if (stack.Any(s => s.Contains("Selenium") || s.Contains("Unit")))
+                    skills.Add(new GeminiSkillRequirementDTO { SkillName = "Automation Test", RequiredLevel = 3, Importance = 4 });
+            }
+            else if (pkgName.Contains("Design"))
+            {
+                skills.Add(new GeminiSkillRequirementDTO { SkillName = "System Design", RequiredLevel = 4, Importance = 5 });
+                skills.Add(new GeminiSkillRequirementDTO { SkillName = "Database Design", RequiredLevel = 4, Importance = 5 });
+            }
+            else if (pkgName.Contains("DevOps"))
+            {
+                var keys = new[] { "Docker", "Kubernetes", "AWS", "Azure", "CI/CD", "Jenkins", "Git" };
+                foreach(var t in stack) 
+                    if(keys.Any(k => t.IndexOf(k, StringComparison.OrdinalIgnoreCase) >= 0))
+                        skills.Add(new GeminiSkillRequirementDTO { SkillName = t, RequiredLevel = 3, Importance = 5 });
+                
+                if (!skills.Any()) skills.Add(new GeminiSkillRequirementDTO { SkillName = "DevOps", RequiredLevel = 3, Importance = 5 });
+            }
+
+            return skills.DistinctBy(s => s.SkillName).ToList();
         }
     }
 }

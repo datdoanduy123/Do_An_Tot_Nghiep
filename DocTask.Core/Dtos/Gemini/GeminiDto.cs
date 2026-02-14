@@ -44,6 +44,7 @@ namespace DocTask.Core.Dtos.Gemini
             public string Frequency { get; set; } = "daily"; // daily/weekly/monthly
             public List<int> AssignedUserIds { get; set; } = new();
             public List<int> AssignedUnitIds { get; set; } = new();
+            public List<GeminiSubtaskDto> Subtasks { get; set; } = new();
         }
 
         public class ChatRequest

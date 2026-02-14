@@ -53,7 +53,11 @@ namespace DocTask.Data.Repositories
         {
             var root = await _context.TaskDrafts
                 .Include(d => d.DraftSkills).ThenInclude(ds => ds.Skill)
-                .Include(d => d.InverseParentDraft).ThenInclude(sub => sub.DraftSkills).ThenInclude(ss => ss.Skill)
+                .Include(d => d.InverseParentDraft)
+                    .ThenInclude(sub => sub.DraftSkills).ThenInclude(ss => ss.Skill)
+                .Include(d => d.InverseParentDraft)
+                    .ThenInclude(sub => sub.InverseParentDraft)
+                        .ThenInclude(sub2 => sub2.DraftSkills).ThenInclude(ss => ss.Skill)
                 .FirstOrDefaultAsync(d => d.DraftId == id);
 
             return root;

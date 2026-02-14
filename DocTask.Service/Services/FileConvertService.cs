@@ -98,7 +98,14 @@ namespace DocTask.Service.Services
         {
             using var stream = new MemoryStream(file);
             using var doc = WordprocessingDocument.Open(stream, false);
-            return doc.MainDocumentPart?.Document?.Body?.InnerText ?? string.Empty;
+            if (doc.MainDocumentPart?.Document?.Body == null) return string.Empty;
+
+            var sb = new StringBuilder();
+            foreach (var paragraph in doc.MainDocumentPart.Document.Body.Descendants<Doc.Paragraph>())
+            {
+                sb.AppendLine(paragraph.InnerText);
+            }
+            return sb.ToString();
         }
 
         private string ParseExcel(byte[] file)
