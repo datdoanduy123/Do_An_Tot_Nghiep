@@ -583,6 +583,12 @@ public partial class ApplicationDbContext : DbContext
                         j.HasKey("TaskId", "UserId");
                         j.ToTable("taskassignees");
                     });
+
+            entity.HasOne(d => d.ParentTask)
+                .WithMany() // No inverse navigation property
+                .HasForeignKey(d => d.ParentTaskId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_Task_ParentTask");
         });
 
         modelBuilder.Entity<Taskunitassignment>(entity =>

@@ -52,6 +52,7 @@ namespace DockTask.Api.Configurations
             services.AddScoped<IEmailService, EmailService>();
             services.AddScoped<IAutomationService, AutomationService>();
             services.AddScoped<IEmployeeClusteringService, EmployeeClusteringService>();
+            services.AddScoped<IAutoAssignmentService, AutoAssignmentService>();
 
             // ===== Repositories =====
             services.AddScoped<IEmployeeProfileRepository, EmployeeProfileRepository>();

@@ -23,10 +23,12 @@ namespace DocTask.Api.Controllers
     public class TaskDraftController : ControllerBase
     {
         private readonly ITaskDraftService _draftService;
+        private readonly ITaskService _taskService;
 
-        public TaskDraftController(ITaskDraftService draftService)
+        public TaskDraftController(ITaskDraftService draftService, ITaskService taskService)
         {
             _draftService = draftService;
+            _taskService = taskService;
         }
 
         // ================================================================
@@ -194,6 +196,34 @@ namespace DocTask.Api.Controllers
             catch (KeyNotFoundException ex)
             {
                 return NotFound(new ApiResponse<object> { Success = false, Message = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new ApiResponse<object> { Success = false, Message = ex.Message });
+            }
+        }
+
+        // ================================================================
+        //  SMART ASSIGNMENT
+        // ================================================================
+
+        /// <summary>
+        /// Trigger Smart Assignment Engine cho toàn bộ draft.
+        /// Tính toán dựa trên Skill + Availability + Workload.
+        /// </summary>
+        [HttpPost("{draftId}/auto-assign")]
+        [SwaggerOperation(Summary = "Tự động gợi ý phân công cho draft (Smart Engine)")]
+        public async Task<IActionResult> AutoAssignDraft(int draftId)
+        {
+            try
+            {
+                var proposals = await _taskService.AutoAssignDraftAsync(draftId);
+                return Ok(new ApiResponse<List<AssignmentProposalDto>> 
+                { 
+                    Data = proposals, 
+                    Success = true,
+                    Message = $"Đã đề xuất phân công cho {proposals.Count} tasks."
+                });
             }
             catch (Exception ex)
             {

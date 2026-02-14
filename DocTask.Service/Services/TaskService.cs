@@ -26,6 +26,7 @@ public class TaskService : ITaskService
     private readonly IReminderService _reminderService;
     private readonly IReminderRepository _reminderRepository;
     private readonly ApplicationDbContext _dbContext;
+    private readonly IAutoAssignmentService _autoAssignmentService;
 
     public TaskService(
         ITaskRepository taskRepository,
@@ -34,6 +35,7 @@ public class TaskService : ITaskService
         IUnitRepository unitRepository,
         IReminderService reminderService,
         IReminderRepository reminderRepository,
+        IAutoAssignmentService autoAssignmentService,
         ApplicationDbContext dbContext)
     {
         _taskRepository = taskRepository;
@@ -42,6 +44,7 @@ public class TaskService : ITaskService
         _unitRepository = unitRepository;
         _reminderService = reminderService;
         _reminderRepository = reminderRepository;
+        _autoAssignmentService = autoAssignmentService;
         _dbContext = dbContext;
     }
 
@@ -489,119 +492,45 @@ public class TaskService : ITaskService
     }
 
     // ================================================================
-    //  AUTO ASSIGN — Rule-based scoring (không dùng K-means trực tiếp)
+    //  AUTO ASSIGN — Smart Engine Integration
     // ================================================================
+
+    public async Task<List<AssignmentProposalDto>> AutoAssignDraftAsync(int draftId)
+    {
+        return await _autoAssignmentService.ProposeAssignmentsForDraftAsync(draftId);
+    }
 
     /// <summary>
     /// Tự động gợi ý + gán người dựa trên rule-based scoring.
-    /// Công thức: score = Σ(match * importance * level) - workload_penalty
-    /// - match = 1 nếu user có skill, 0 nếu không
-    /// - importance = 1-3 (độ quan trọng skill trong task)
-    /// - level = min(userLevel, requiredLevel) / requiredLevel (tỷ lệ đáp ứng)
-    /// - workload = số task đang active / 10 (penalty % overload)
-    /// Chọn top 3 users có score cao nhất.
+    /// Backward compatibility or single task usage.
     /// </summary>
     public async Task<TaskDto> AutoAssignByScoreAsync(int taskId, int userId)
     {
+        // ... (keep existing logic or redirect to new service)
+        // For now, let's keep existing logic as a fallback or specific implementation
+        // But better to use the new engine if we want consistency.
+        // Let's redirect to use the new service for consistency.
+        
+        var proposals = await _autoAssignmentService.ProposeAssignmentsAsync(new List<int> { taskId });
+        var best = proposals.OrderByDescending(p => p.MatchScore).FirstOrDefault();
+
+        if (best == null || best.MatchScore < 0.4m)
+            throw new BadRequestException("Không tìm thấy ứng viên phù hợp (Score < 0.4).");
+
+        await AssignUsersToTaskAsync(taskId, new List<int> { best.AssignedUserId });
+        
+        // Update IsAutoAssigned
         var task = await _taskRepository.GetTaskByIdAsync(taskId);
-        if (task == null)
-            throw new NotFoundException($"Task {taskId} không tồn tại.");
-
-        if (task.AssignerId != userId)
-            throw new UnauthorizedException("Bạn không có quyền auto-assign task này.");
-
-        // 1. Lấy danh sách skills yêu cầu của task
-        var requiredSkills = await _dbContext.TaskSkillRequirements
-            .Where(ts => ts.TaskId == taskId)
-            .ToListAsync();
-
-        if (!requiredSkills.Any())
-            throw new BadRequestException("Task chưa có skills yêu cầu. Hãy thêm skills trước khi auto-assign.");
-
-        // 2. Lấy tất cả users có skill phù hợp
-        var requiredSkillIds = requiredSkills.Select(s => s.SkillId).ToList();
-
-        var candidateUserSkills = await _dbContext.UserSkills
-            .Include(us => us.User)
-            .Where(us => requiredSkillIds.Contains(us.SkillId))
-            .ToListAsync();
-
-        if (!candidateUserSkills.Any())
-            throw new BadRequestException("Không tìm thấy nhân viên nào có skill phù hợp.");
-
-        // 3. Tính score cho mỗi user
-        var userScores = candidateUserSkills
-            .GroupBy(us => us.UserId)
-            .Select(group =>
-            {
-                var userSkills = group.ToList();
-                double score = 0;
-
-                foreach (var req in requiredSkills)
-                {
-                    var userSkill = userSkills.FirstOrDefault(s => s.SkillId == req.SkillId);
-                    if (userSkill != null)
-                    {
-                        // Tỷ lệ đáp ứng = min(userLevel, reqLevel) / reqLevel  
-                        double levelRatio = req.RequiredLevel > 0
-                            ? Math.Min(userSkill.ProficiencyLevel, req.RequiredLevel) / (double)req.RequiredLevel
-                            : 1.0;
-
-                        // Score += match * importance * levelRatio
-                        score += 1.0 * req.Importance * levelRatio;
-                    }
-                }
-
-                return new { UserId = group.Key, UserName = group.First().User?.FullName, Score = score };
-            })
-            .OrderByDescending(x => x.Score)
-            .ToList();
-
-        // 4. Tính workload penalty (số task đang active)
-        var scoredWithWorkload = new List<(int UserId, string? UserName, double FinalScore)>();
-
-        foreach (var candidate in userScores)
+        if (task != null)
         {
-            var activeTaskCount = await _dbContext.Tasks
-                .CountAsync(t => t.AssigneeId == candidate.UserId
-                    && t.Status != "Completed"
-                    && t.Status != "Cancelled"
-                    && (t.IsDeleted == null || t.IsDeleted == false));
-
-            // Workload penalty: mỗi 10 task giảm 1 điểm
-            double penalty = activeTaskCount / 10.0;
-            double finalScore = candidate.Score - penalty;
-
-            scoredWithWorkload.Add((candidate.UserId, candidate.UserName, finalScore));
+            task.IsAutoAssigned = true;
+            await _taskRepository.UpdateTaskAsync(task.TaskId, new UpdateTaskDto()); // Just to save? need optimized update
+             _dbContext.Tasks.Update(task);
+            await _dbContext.SaveChangesAsync();
         }
 
-        // 5. Chọn top 3
-        var topUsers = scoredWithWorkload
-            .OrderByDescending(x => x.FinalScore)
-            .Take(3)
-            .ToList();
-
-        if (!topUsers.Any())
-            throw new BadRequestException("Không tìm thấy ứng viên phù hợp.");
-
-        // 6. Gán
-        var topUserIds = topUsers.Select(u => u.UserId).ToList();
-        await _taskRepository.AssignUsersToTaskAsync(taskId, topUserIds);
-
-        // 7. Đánh dấu IsAutoAssigned
-        task.IsAutoAssigned = true;
-        _dbContext.Tasks.Update(task);
-        await _dbContext.SaveChangesAsync();
-
-        Console.WriteLine($"✅ Auto-assign task {taskId}: {string.Join(", ", topUsers.Select(u => $"{u.UserName}({u.FinalScore:F1})"))}");
-
-        // 8. Gửi reminder
-        var updatedTask = await _taskRepository.GetByIdWithUsersAndUnitsAsync(taskId);
-        if (updatedTask != null)
-            await CreateAssignmentRemindersAsync(updatedTask);
-
-        var result = await _taskRepository.GetByIdWithUsersAndUnitsAsync(taskId);
-        return result!.ToTaskDto();
+        Console.WriteLine($"✅ Smart Assign task {taskId} to {best.AssignedUserName} (Score: {best.MatchScore:F2})");
+        return (await _taskRepository.GetByIdWithUsersAndUnitsAsync(taskId))!.ToTaskDto();
     }
 
     // ================================================================

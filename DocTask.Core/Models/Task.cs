@@ -72,5 +72,7 @@ public partial class Task
     public virtual ICollection<TaskSkillRequirement> SkillRequirements { get; set; } = new List<TaskSkillRequirement>();
     
     public virtual ICollection<AssignmentHistory> AssignmentHistories { get; set; } = new List<AssignmentHistory>();
+
+    public virtual Task? ParentTask { get; set; }
 }
 

@@ -35,8 +35,19 @@ public partial class EmployeeProfile
     public decimal CurrentWorkloadPercentage { get; set; }
     
     /// <summary>
+    /// Tổng năng suất (giờ) trong tuần
+    /// Mặc định 40h
+    /// </summary>
+    public decimal WeeklyCapacity { get; set; } = 40;
+
+    /// <summary>
+    /// Số giờ đã được giao trong tuần hiện tại
+    /// </summary>
+    public decimal CurrentWorkloadHours { get; set; } = 0;
+
+    /// <summary>
     /// Số giờ khả dụng còn lại trong tuần
-    /// VD: 40 giờ (full-time), 20 giờ (part-time)
+    /// Value = WeeklyCapacity - CurrentWorkloadHours (Calculated by Service)
     /// </summary>
     public decimal AvailableHoursPerWeek { get; set; }
     
