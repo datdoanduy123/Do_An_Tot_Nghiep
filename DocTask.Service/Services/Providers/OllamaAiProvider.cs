@@ -91,8 +91,8 @@ namespace DocTask.Service.Services.Providers
                     }
                 };
 
-                // Timeout dài hơn cho local model (có thể chậm trên CPU)
-                using var cts = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(120));
+                // Timeout 300s cho local model (có thể chậm trên CPU, cần thêm thời gian cho JSON 3-level)
+                using var cts = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(300));
 
                 var url = $"{_baseUrl}/api/chat";
                 Console.WriteLine($"🤖 [Ollama] Gọi model {_model} tại {url}");
@@ -130,12 +130,12 @@ namespace DocTask.Service.Services.Providers
             }
             catch (TaskCanceledException)
             {
-                Console.WriteLine("⏱️ [Ollama] Request timeout (120s)");
+                Console.WriteLine("⏱️ [Ollama] Request timeout (300s) — model chậm, thử model nhẹ hơn.");
                 return new AiCompletionResponse
                 {
                     Success = false,
                     ProviderUsed = ProviderName,
-                    ErrorMessage = "Ollama request timeout sau 120 giây"
+                    ErrorMessage = "Ollama request timeout sau 300 giây"
                 };
             }
             catch (HttpRequestException ex)

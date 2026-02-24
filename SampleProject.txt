@@ -1,0 +1,125 @@
+TÀI LIỆU YÊU CẦU HỆ THỐNG
+Tên dự án: Hệ thống Quản lý Bán hàng Online (E-Commerce Management System)
+Thời gian: 01/03/2026 - 31/08/2026
+Ngân sách: 500,000,000 VNĐ
+
+=========================================
+MÔ TẢ DỰ ÁN
+=========================================
+Xây dựng hệ thống thương mại điện tử hoàn chỉnh cho phép người dùng mua sắm 
+trực tuyến, quản lý đơn hàng, thanh toán và giao hàng. Hệ thống bao gồm website 
+cho khách hàng và trang quản trị cho admin.
+
+Công nghệ sử dụng:
+- Backend: ASP.NET Core 8, Entity Framework Core, SQL Server
+- Frontend: ReactJS, TypeScript, TailwindCSS
+- Authentication: JWT Token
+- Payment: VNPay, Momo
+- Cloud: Azure Blob Storage
+- DevOps: Docker, GitHub Actions
+
+=========================================
+CHỨC NĂNG 1: QUẢN LÝ NGƯỜI DÙNG & XÁC THỰC
+=========================================
+Mô tả: Xây dựng hệ thống đăng ký, đăng nhập và quản lý tài khoản người dùng.
+
+Yêu cầu chi tiết:
+1.1 Đăng ký tài khoản (email, số điện thoại)
+1.2 Đăng nhập bằng email/mật khẩu, Google OAuth
+1.3 Đăng nhập bằng số điện thoại + OTP
+1.4 Quên mật khẩu và đặt lại mật khẩu
+1.5 Quản lý hồ sơ cá nhân (avatar, địa chỉ, thông tin)
+1.6 Phân quyền: Customer, Seller, Admin
+1.7 Lịch sử đăng nhập và bảo mật 2 lớp (2FA)
+Thời gian: 01/03/2026 - 31/03/2026
+Ước tính: 320 giờ
+
+=========================================
+CHỨC NĂNG 2: QUẢN LÝ SẢN PHẨM & DANH MỤC
+=========================================
+Mô tả: Cho phép seller thêm, sửa, xóa sản phẩm và admin quản lý danh mục.
+
+Yêu cầu chi tiết:
+2.1 CRUD danh mục sản phẩm (đa cấp)
+2.2 Thêm/sửa/xóa sản phẩm (ảnh, giá, tồn kho, mô tả)
+2.3 Quản lý biến thể sản phẩm (size, màu sắc, v.v.)
+2.4 Import sản phẩm hàng loạt từ Excel
+2.5 Tìm kiếm và lọc sản phẩm nâng cao (Elasticsearch)
+2.6 Đánh giá và bình luận sản phẩm
+2.7 Sản phẩm nổi bật, flash sale, giảm giá
+Thời gian: 01/03/2026 - 15/04/2026
+Ước tính: 480 giờ
+
+=========================================
+CHỨC NĂNG 3: GIỎ HÀNG & THANH TOÁN
+=========================================
+Mô tả: Quản lý giỏ hàng và tích hợp cổng thanh toán VNPay, Momo.
+
+Yêu cầu chi tiết:
+3.1 Thêm/xóa/cập nhật giỏ hàng
+3.2 Áp dụng mã giảm giá (voucher, coupon)
+3.3 Tính phí vận chuyển theo khu vực
+3.4 Tích hợp VNPay (ATM, Credit Card, QR)
+3.5 Tích hợp Momo Wallet
+3.6 Thanh toán khi nhận hàng (COD)
+3.7 Lịch sử giao dịch và hóa đơn PDF
+3.8 Hoàn tiền khi hủy đơn
+Thời gian: 01/04/2026 - 30/04/2026
+Ước tính: 400 giờ
+
+=========================================
+CHỨC NĂNG 4: QUẢN LÝ ĐƠN HÀNG & VẬN CHUYỂN
+=========================================
+Mô tả: Theo dõi trạng thái đơn hàng và tích hợp API vận chuyển.
+
+Yêu cầu chi tiết:
+4.1 Tạo đơn hàng và chọn địa chỉ giao hàng
+4.2 Quản lý trạng thái đơn (Chờ xác nhận → Đang giao → Hoàn thành)
+4.3 Tích hợp API GHN (Giao Hàng Nhanh)
+4.4 Tích hợp API GHTK (Giao Hàng Tiết Kiệm)
+4.5 Theo dõi đơn hàng real-time (SignalR)
+4.6 Thông báo email/SMS khi đơn thay đổi trạng thái
+4.7 Quản lý đơn hàng bulk cho seller
+Thời gian: 01/05/2026 - 31/05/2026
+Ước tính: 360 giờ
+
+=========================================
+CHỨC NĂNG 5: DASHBOARD & BÁO CÁO ADMIN
+=========================================
+Mô tả: Trang quản trị với thống kê doanh thu, đơn hàng, người dùng.
+
+Yêu cầu chi tiết:
+5.1 Dashboard tổng quan (doanh thu, đơn hàng, người dùng mới)
+5.2 Báo cáo doanh thu theo ngày/tháng/năm (biểu đồ)
+5.3 Thống kê sản phẩm bán chạy
+5.4 Quản lý người dùng và phân quyền
+5.5 Quản lý khiếu nại và hỗ trợ khách hàng
+5.6 Xuất báo cáo Excel/PDF
+5.7 Cài đặt hệ thống (logo, banner, SEO)
+Thời gian: 01/06/2026 - 30/06/2026
+Ước tính: 280 giờ
+
+=========================================
+CHỨC NĂNG 6: KIỂM THỬ & TRIỂN KHAI
+=========================================
+Mô tả: Kiểm thử toàn diện và triển khai lên môi trường production.
+
+Yêu cầu chi tiết:
+6.1 Unit Testing (NUnit, xUnit) - coverage > 80%
+6.2 Integration Testing các API
+6.3 UI Testing (Cypress, Selenium)
+6.4 Performance Testing (k6, JMeter)
+6.5 Security Testing (OWASP Top 10)
+6.6 Triển khai CI/CD với GitHub Actions
+6.7 Deploy lên Azure App Service + Azure SQL
+6.8 Monitoring với Azure Application Insights
+Thời gian: 01/07/2026 - 31/08/2026
+Ước tính: 320 giờ
+
+=========================================
+YÊU CẦU PHI CHỨC NĂNG
+=========================================
+- Hiệu năng: API response < 200ms, hỗ trợ 1000 concurrent users
+- Bảo mật: HTTPS, JWT, CSRF protection, rate limiting
+- Khả dụng: Uptime 99.9%
+- Khả năng mở rộng: Horizontal scaling với Docker/Kubernetes

@@ -97,14 +97,47 @@ namespace DocTask.Service.Services
                     Console.WriteLine($"⚠️ Error saving root draft skills: {ex.Message}");
                 }
 
-                // 4. Tạo Subtasks (Recursive)
-                if (aiTask.Subtasks != null && aiTask.Subtasks.Any())
+                // 4. Tạo Epic/Task Drafts (Recursive 3 level)
+                // ⭐ Ưu tiên Epics (schema mới 3 level), fallback sang Subtasks (schema cũ 2 level)
+                List<GeminiDto.GeminiSubtaskDto>? subtasksToCreate = null;
+
+                if (aiTask.Epics != null && aiTask.Epics.Any())
                 {
-                    await CreateSubTaskDrafts(rootDraft.DraftId, aiTask.Subtasks, fileId, userId);
+                    // Map Epic (Level 2) → SubtaskDto có Subtasks = Tasks (Level 3)
+                    subtasksToCreate = aiTask.Epics.Select(epic => new GeminiDto.GeminiSubtaskDto
+                    {
+                        Title          = epic.Title,
+                        Description    = epic.Description,
+                        StartDate      = epic.StartDate,
+                        DueDate        = epic.DueDate,
+                        EstimatedHours = epic.EstimatedHours,
+                        Priority       = "Medium",
+                        RequiredSkills = epic.RequiredSkills,
+                        // Tasks (Level 3) → Subtasks lồng bên trong Epic
+                        Subtasks = epic.Tasks?.Select(t => new GeminiDto.GeminiSubtaskDto
+                        {
+                            Title          = t.Title,
+                            Description    = t.Description,
+                            StartDate      = t.StartDate,
+                            DueDate        = t.DueDate,
+                            EstimatedHours = t.EstimatedHours,
+                            Priority       = t.Priority,
+                            RequiredSkills = t.RequiredSkills,
+                            Subtasks       = new List<GeminiDto.GeminiSubtaskDto>()
+                        }).ToList() ?? new List<GeminiDto.GeminiSubtaskDto>()
+                    }).ToList();
+
+                    Console.WriteLine($"✅ [TaskDraftService] Mapping {aiTask.Epics.Count} Epics → SubtaskDtos (3-level)");
+                }
+
+                if (subtasksToCreate != null && subtasksToCreate.Any())
+                {
+                    await CreateSubTaskDrafts(rootDraft.DraftId, subtasksToCreate, fileId, userId);
                 }
 
                 Console.WriteLine($"🎉 Draft creation completed! draftId: {rootDraft.DraftId}");
                 return rootDraft.DraftId;
+
             }
             catch (Exception ex)
             {

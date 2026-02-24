@@ -256,14 +256,17 @@ public class SubTaskService : ISubTaskService
         if (foundUser == null)
             throw new NotFoundException("Invalid user");
 
-        if (foundUser.UnitUser.Level > 1)
+        if (foundUser.UnitUser != null && foundUser.UnitUser.Level > 1)
+            return result;
+
+        if (!foundUser.UnitId.HasValue)
             return result;
 
         var foundUnit = await _unitRepository.GetUnitByIdAsync(foundUser.UnitId.Value);
         if (foundUnit == null)
             throw new NotFoundException("Unit not found");
 
-        if (foundUnit.UnitParent != null)
+        if (foundUnit.UnitParent.HasValue)
         {
             var peerModels = await _unitRepository.GetSubUnitsByParentUnitIdAsync(foundUnit.UnitParent.Value);
             result.peers = peerModels.Where(p => p.UnitId != foundUnit.UnitId).Select(p => p.ToUnitBasicDto()).ToList();

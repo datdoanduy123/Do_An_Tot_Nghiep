@@ -90,65 +90,59 @@ namespace DocTask.Service.Services
 
         if (projectInfo.Modules.Any())
         {
-            Console.WriteLine($"✅ [GeminiService] Detected {projectInfo.Modules.Count} modules entirely via Template.");
-            
+            Console.WriteLine($"✅ [GeminiService] Detected {projectInfo.Modules.Count} modules entirely via Template → map to Epics.");
+
             var pStart = projectStartDate ?? DateTime.Now;
-            var pEnd = projectEndDate ?? DateTime.Now.AddDays(30);
+            var pEnd   = projectEndDate ?? DateTime.Now.AddDays(30);
 
-            var aiTask = new GeminiTaskDto
-            {
-                Title = !string.IsNullOrWhiteSpace(projectInfo.Title) ? projectInfo.Title : "Dự án mới",
-                Description = !string.IsNullOrWhiteSpace(projectInfo.Description) ? projectInfo.Description : "Được trích xuất từ template tài liệu.",
-                StartDate = pStart,
-                EndDate = pEnd,
-                EstimatedHours = projectInfo.Modules.Sum(m => m.Hours),
-                Subtasks = new List<GeminiSubtaskDto>()
-            };
-
-            // Distribute timeline sequentially based on hours
-            var totalHours = (double)aiTask.EstimatedHours;
-            if (totalHours <= 0) totalHours = 1; // avoid div by zero
-
-            var totalDays = (pEnd - pStart).TotalDays;
-            var currentStart = pStart;
+            // ⭐ Map Module → GeminiEpicDto (Level 2)
+            var totalHours = (double)projectInfo.Modules.Sum(m => m.Hours);
+            if (totalHours <= 0) totalHours = 1;
+            var totalDays  = (pEnd - pStart).TotalDays;
+            var epicStart  = pStart;
+            var epicsList  = new List<GeminiEpicDto>();
 
             foreach (var m in projectInfo.Modules)
             {
-                var ratio = m.Hours / totalHours;
-                var durationDays = totalDays * ratio;
-                
-                // Ensure at least 1 day
-                if (durationDays < 1) durationDays = 1;
+                var ratio       = m.Hours / totalHours;
+                var durationDays = Math.Max(1.0, totalDays * ratio);
+                var epicEnd     = epicStart.AddDays(durationDays);
+                if (epicEnd > pEnd) epicEnd = pEnd;
 
-                var moduleEnd = currentStart.AddDays(durationDays);
-                if (moduleEnd > pEnd) moduleEnd = pEnd;
+                // ⭐ Sinh Work Packages dưới dạng GeminiSubtaskDto (Level 3)
+                var tasks = GenerateWorkPackages(m, projectInfo.TechStack, epicStart, epicEnd);
 
-                var geminiSubtask = new GeminiSubtaskDto
+                epicsList.Add(new GeminiEpicDto
                 {
-                    Title = m.Name,
-                    Description = m.Desc,
+                    Title          = $"Epic: {m.Name}",
+                    Description    = m.Desc,
                     EstimatedHours = m.Hours,
-                    StartDate = currentStart,
-                    DueDate = moduleEnd,
-                    RequiredSkills = new List<GeminiSkillRequirementDTO>()
-                };
+                    StartDate      = epicStart,
+                    DueDate        = epicEnd,
+                    RequiredSkills = new List<GeminiSkillRequirementDTO>(),
+                    Tasks          = tasks
+                });
 
-                // Create Work Packages for this module
-                geminiSubtask.Subtasks = GenerateWorkPackages(m, projectInfo.TechStack, currentStart, moduleEnd);
-                
-                aiTask.Subtasks.Add(geminiSubtask);
-
-                // Next module starts when this one ends
-                currentStart = moduleEnd;
+                epicStart = epicEnd;
             }
 
-            // Save Draft directly
+            var aiTask = new GeminiTaskDto
+            {
+                Title          = !string.IsNullOrWhiteSpace(projectInfo.Title) ? projectInfo.Title : "Dự án mới",
+                Description    = !string.IsNullOrWhiteSpace(projectInfo.Description) ? projectInfo.Description : "Được trích xuất từ template tài liệu.",
+                StartDate      = pStart,
+                EndDate        = pEnd,
+                EstimatedHours = (decimal)totalHours,
+                Epics          = epicsList
+            };
+
+            // TaskDraftService.CreateDraftFromGeminiAsync sẽ tự xử lý Epics
             var createdDraftId = await _taskDraftService.CreateDraftFromGeminiAsync(aiTask, fileId, userId);
 
             return new ChatResponse
             {
-                Response = $"Đã trích xuất thành công dự án \"{aiTask.Title}\" với {aiTask.Subtasks.Count} module từ tài liệu.",
-                DraftId = createdDraftId,
+                Response  = $"Đã trích xuất thành công dự án \"{aiTask.Title}\" với {aiTask.Epics.Count} epic từ tài liệu.",
+                DraftId   = createdDraftId,
                 AiResponse = aiTask
             };
         }
@@ -163,7 +157,6 @@ namespace DocTask.Service.Services
             ["Tên file"] = file.FileName
         };
 
-        // ⭐ LAYER 2: Inject extracted timeline vào prompt (nếu có)
         if (projectStartDate != null && projectEndDate != null)
         {
             additionalContext["Thời gian dự án (ĐÃ XÁC NHẬN)"] = TimelineExtractor.FormatForPrompt(projectStartDate, projectEndDate);
@@ -199,14 +192,14 @@ namespace DocTask.Service.Services
         // ⭐ LAYER 3: Merge và override với extracted timeline
         var merged = MergeChunkResponses(chunkResponses, projectStartDate, projectEndDate);
 
-        // Lưu vào Draft thay vì cache
+        // Lưu vào Draft — TaskDraftService sẽ tự đọc Epics và lưu 3 level
         var draftId = await _taskDraftService.CreateDraftFromGeminiAsync(merged, fileId, userId);
 
         var response = new ChatResponse
         {
-            Response = "Đã tạo bản nháp thành công",
-            DraftId = draftId,
-            AiResponse = merged // mergerd now returns GeminiTaskDto
+            Response   = "Đã tạo bản nháp thành công",
+            DraftId    = draftId,
+            AiResponse = merged
         };
 
         return response;
@@ -532,172 +525,226 @@ namespace DocTask.Service.Services
             return chunks;
         }
 
-        // Helper: merge các chunk JSON thành 1
+        /// <summary>
+        /// Merge nhiều chunk JSON từ AI thành 1 GeminiTaskDto 3 cấp.
+        /// Hỗ trợ cả schema cũ (subtasks) và schema mới (epics[].tasks[]).
+        /// </summary>
         private GeminiTaskDto MergeChunkResponses(
-            List<JsonElement> chunkResponses, 
+            List<JsonElement> chunkResponses,
             DateTime? projectStartDate = null,
-            DateTime? projectEndDate = null
+            DateTime? projectEndDate   = null
         )
         {
             if (chunkResponses.Count == 0) return new GeminiTaskDto();
 
-            // Lấy title và description từ chunk đầu tiên
             var firstChunk = chunkResponses[0];
-            
-            // Helper: lấy property case-insensitive
-            JsonElement? GetProperty(JsonElement element, string name)
+            var jsonOptions = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+            string[] dateFormats = { "dd/MM/yyyy", "yyyy-MM-dd", "MM/dd/yyyy", "yyyy/MM/dd" };
+
+            // ── Helper: lấy property case-insensitive ────────────────────
+            JsonElement? GetProp(JsonElement el, string name)
             {
-                if (element.TryGetProperty(name, out var prop)) return prop;
-                if (element.TryGetProperty(char.ToUpper(name[0]) + name.Substring(1), out var propUpper)) return propUpper;
-                if (element.TryGetProperty(name.ToUpper(), out var propAllUpper)) return propAllUpper;
+                if (el.TryGetProperty(name, out var p)) return p;
+                if (el.TryGetProperty(char.ToUpper(name[0]) + name.Substring(1), out var pU)) return pU;
                 return null;
             }
 
-            string title = "Untitled Task";
-            string description = "";
+            // ── Lấy metadata từ chunk đầu tiên ──────────────────────────
+            var title       = GetProp(firstChunk, "title")?.GetString() ?? "Untitled Project";
+            var description = GetProp(firstChunk, "description")?.GetString() ?? "";
 
-            var titlePropRaw = GetProperty(firstChunk, "title");
-            if (titlePropRaw.HasValue) title = titlePropRaw.Value.GetString() ?? title;
-            
-            var descPropRaw = GetProperty(firstChunk, "description");
-            if (descPropRaw.HasValue) description = descPropRaw.Value.GetString() ?? "";
-
-            var mergedSubtasks = new List<JsonElement>();
-            DateTime? aiStartDate = null;
-            DateTime? aiEndDate = null;
-            decimal? estimatedHours = null;
+            var mergedEpics  = new List<JsonElement>();
             var mergedSkills = new List<JsonElement>();
-
-            string[] dateFormats = { "dd/MM/yyyy", "yyyy-MM-dd", "MM/dd/yyyy", "yyyy/MM/dd" };
+            DateTime? aiStart = null;
+            DateTime? aiEnd   = null;
+            decimal?  totalHours = null;
 
             foreach (var chunk in chunkResponses)
             {
-                // Merge subtasks
-                var subtasksProp = GetProperty(chunk, "subtasks");
-                if (subtasksProp.HasValue && subtasksProp.Value.ValueKind == JsonValueKind.Array)
+                // ── Merge epics[] (schema mới 3 level) ─────────────────
+                var epicsProp = GetProp(chunk, "epics");
+                if (epicsProp.HasValue && epicsProp.Value.ValueKind == JsonValueKind.Array)
+                    mergedEpics.AddRange(epicsProp.Value.EnumerateArray());
+
+                // ── Fallback: merge subtasks[] (schema cũ 2 level) ─────
+                if (!mergedEpics.Any())
                 {
-                    mergedSubtasks.AddRange(subtasksProp.Value.EnumerateArray());
+                    var subtasksProp = GetProp(chunk, "subtasks");
+                    if (subtasksProp.HasValue && subtasksProp.Value.ValueKind == JsonValueKind.Array)
+                        mergedEpics.AddRange(subtasksProp.Value.EnumerateArray());
                 }
 
-                // Lấy startDate sớm nhất từ AI
-                var sProp = GetProperty(chunk, "startDate");
-                if (sProp.HasValue && sProp.Value.ValueKind == JsonValueKind.String)
-                {
-                    string sVal = sProp.Value.GetString();
-                    if (DateTime.TryParseExact(sVal, dateFormats, CultureInfo.InvariantCulture, DateTimeStyles.None, out var sd))
-                    {
-                        aiStartDate = aiStartDate == null || sd < aiStartDate ? sd : aiStartDate;
-                    }
-                }
+                // ── Project timeline ───────────────────────────────────
+                var sRaw = GetProp(chunk, "startDate")?.GetString();
+                if (sRaw != null && DateTime.TryParseExact(sRaw, dateFormats, CultureInfo.InvariantCulture, DateTimeStyles.None, out var sd))
+                    aiStart = aiStart == null || sd < aiStart ? sd : aiStart;
 
-                // Lấy endDate muộn nhất từ AI
-                var eProp = GetProperty(chunk, "endDate");
-                if (eProp.HasValue && eProp.Value.ValueKind == JsonValueKind.String)
-                {
-                    string eVal = eProp.Value.GetString();
-                    if (DateTime.TryParseExact(eVal, dateFormats, CultureInfo.InvariantCulture, DateTimeStyles.None, out var ed))
-                    {
-                        aiEndDate = aiEndDate == null || ed > aiEndDate ? ed : aiEndDate;
-                    }
-                }
+                var eRaw = GetProp(chunk, "endDate")?.GetString();
+                if (eRaw != null && DateTime.TryParseExact(eRaw, dateFormats, CultureInfo.InvariantCulture, DateTimeStyles.None, out var ed))
+                    aiEnd = aiEnd == null || ed > aiEnd ? ed : aiEnd;
 
-                // Merge estimatedHours
-                var hProp = GetProperty(chunk, "estimatedHours");
+                var hProp = GetProp(chunk, "estimatedHours");
                 if (hProp.HasValue && hProp.Value.ValueKind == JsonValueKind.Number)
-                {
-                    estimatedHours = (estimatedHours ?? 0) + hProp.Value.GetDecimal();
-                }
+                    totalHours = (totalHours ?? 0) + hProp.Value.GetDecimal();
 
-                // Merge requiredSkills
-                var skillsProp = GetProperty(chunk, "requiredSkills");
+                // ── Merge project-level skills ─────────────────────────
+                var skillsProp = GetProp(chunk, "requiredSkills");
                 if (skillsProp.HasValue && skillsProp.Value.ValueKind == JsonValueKind.Array)
-                {
                     mergedSkills.AddRange(skillsProp.Value.EnumerateArray());
-                }
             }
 
-            // ⭐ LAYER 3: Override timeline
-            DateTime finalStartDate;
-            DateTime finalEndDate;
-
-            if (projectStartDate != null && projectEndDate != null)
-            {
-                if (projectStartDate > projectEndDate)
-                {
-                    finalStartDate = aiStartDate ?? DateTime.Now;
-                    finalEndDate = aiEndDate ?? DateTime.Now.AddDays(45);
-                }
-                else
-                {
-                    finalStartDate = projectStartDate.Value;
-                    finalEndDate = projectEndDate.Value;
-                }
-            }
+            // ── Override timeline với giá trị extract được từ file ─────
+            DateTime finalStart, finalEnd;
+            if (projectStartDate.HasValue && projectEndDate.HasValue && projectStartDate <= projectEndDate)
+            { finalStart = projectStartDate.Value; finalEnd = projectEndDate.Value; }
             else
-            {
-                finalStartDate = aiStartDate ?? DateTime.Now;
-                finalEndDate = aiEndDate ?? DateTime.Now.AddDays(45);
-            }
+            { finalStart = aiStart ?? DateTime.Now; finalEnd = aiEnd ?? DateTime.Now.AddDays(45); }
 
-            // Convert JsonElements to DTOs
-            var subtasksDto = new List<GeminiSubtaskDto>();
-            var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
-            var seenTitles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            
-            foreach (var item in mergedSubtasks)
+            // ── Deserialize Epics (dedup theo title) ───────────────────
+            var seenEpics  = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var epicsDto   = new List<GeminiEpicDto>();
+
+            foreach (var item in mergedEpics)
             {
-                try {
-                    var dto = JsonSerializer.Deserialize<GeminiSubtaskDto>(item.GetRawText(), options);
-                    if (dto != null)
+                try
+                {
+                    var dto = JsonSerializer.Deserialize<GeminiEpicDto>(item.GetRawText(), jsonOptions);
+                    if (dto == null) continue;
+                    var key = dto.Title?.Trim() ?? "";
+                    if (seenEpics.Contains(key)) continue;
+                    seenEpics.Add(key);
+
+                    // Dedup + giới hạn skill epic (max 5)
+                    dto.RequiredSkills = dto.RequiredSkills
+                        .GroupBy(s => s.SkillName.Trim().ToLower())
+                        .Select(g => g.OrderByDescending(s => s.Importance).ThenByDescending(s => s.RequiredLevel).First())
+                        .Take(5).ToList();
+
+                    // Dedup task bên trong epic (max 4 skill/task)
+                    var seenTasks = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                    var cleanedTasks = new List<GeminiSubtaskDto>();
+                    foreach (var t in dto.Tasks)
                     {
-                        // ⭐ Deduplicate subtasks theo title (tránh trùng khi multi-chunk)
-                        var normalizedTitle = dto.Title?.Trim() ?? "";
-                        if (seenTitles.Contains(normalizedTitle))
-                        {
-                            Console.WriteLine($"⚠️ Bỏ subtask trùng: \"{normalizedTitle}\"");
-                            continue; // Skip subtask trùng tên
-                        }
-                        seenTitles.Add(normalizedTitle);
-
-                        // Deduplicate và giới hạn skill cho subtask (max 4)
-                        dto.RequiredSkills = dto.RequiredSkills
+                        var tKey = t.Title?.Trim() ?? "";
+                        if (seenTasks.Contains(tKey)) continue;
+                        seenTasks.Add(tKey);
+                        t.RequiredSkills = t.RequiredSkills
                             .GroupBy(s => s.SkillName.Trim().ToLower())
                             .Select(g => g.OrderByDescending(s => s.Importance).ThenByDescending(s => s.RequiredLevel).First())
-                            .Take(4)
-                            .ToList();
-                        subtasksDto.Add(dto);
+                            .Take(4).ToList();
+                        cleanedTasks.Add(t);
                     }
-                } catch {}
+                    dto.Tasks = cleanedTasks;
+                    epicsDto.Add(dto);
+                }
+                catch { /* bỏ qua epic lỗi parse */ }
             }
 
-            var skillsDto = new List<GeminiSkillRequirementDTO>();
-            foreach (var item in mergedSkills)
-            {
-                try {
-                    var dto = JsonSerializer.Deserialize<GeminiSkillRequirementDTO>(item.GetRawText(), options);
-                    if (dto != null) skillsDto.Add(dto);
-                } catch {}
-            }
-
-            // Deduplicate và giới hạn skill cho task cha (max 8)
-            var finalSkills = skillsDto
-                .GroupBy(s => s.SkillName.Trim().ToLower())
-                .Select(g => g.OrderByDescending(s => s.Importance).ThenByDescending(s => s.RequiredLevel).First())
-                .OrderByDescending(s => s.Importance)
-                .ThenByDescending(s => s.RequiredLevel)
+            // ── Dedup + giới hạn skill project (max 8) ─────────────────
+            var skillsDto = mergedSkills
+                .Select(item => { try { return JsonSerializer.Deserialize<GeminiSkillRequirementDTO>(item.GetRawText(), jsonOptions); } catch { return null; } })
+                .Where(x => x != null)
+                .GroupBy(s => s!.SkillName.Trim().ToLower())
+                .Select(g => g.OrderByDescending(s => s!.Importance).ThenByDescending(s => s!.RequiredLevel).First())
+                .OrderByDescending(s => s!.Importance).ThenByDescending(s => s!.RequiredLevel)
                 .Take(8)
+                .Cast<GeminiSkillRequirementDTO>()
                 .ToList();
 
             return new GeminiTaskDto
             {
-                Title = title,
-                Description = description,
-                StartDate = finalStartDate,
-                EndDate = finalEndDate,
-                EstimatedHours = estimatedHours,
-                RequiredSkills = finalSkills,
-                Subtasks = subtasksDto
+                Title          = title,
+                Description    = description,
+                StartDate      = finalStart,
+                EndDate        = finalEnd,
+                EstimatedHours = totalHours,
+                RequiredSkills = skillsDto,
+                Epics          = epicsDto
             };
+        }
+
+        /// <summary>
+        /// Bridge: chuyển đổi GeminiTaskDto (có Epics[]) sang dạng GeminiTaskDto
+        /// với Epics map thành GeminiSubtaskDto có Subtasks — để TaskDraftService
+        /// tái sử dụng logic đệ quy CreateSubTaskDrafts() mà không cần sửa.
+        /// Level 1: Project (root)
+        /// Level 2: Epic → SubtaskDto cha (ParentDraftId = root)
+        /// Level 3: Task → SubtaskDto con (ParentDraftId = epic)
+        /// </summary>
+        private GeminiTaskDto BridgeEpicsToSubtasks(GeminiTaskDto source)
+        {
+            // Map Epic → GeminiSubtaskDto (Level 2)
+            var epicAsSubtasks = source.Epics.Select(epic => new GeminiSubtaskDto
+            {
+                Title          = epic.Title,
+                Description    = epic.Description,
+                StartDate      = epic.StartDate,
+                DueDate        = epic.DueDate,
+                EstimatedHours = epic.EstimatedHours,
+                Priority       = "Medium",
+                RequiredSkills = epic.RequiredSkills,
+                // Map Task (Level 3) → Subtasks lồng bên trong Epic
+                Subtasks = epic.Tasks.Select(t => new GeminiSubtaskDto
+                {
+                    Title          = t.Title,
+                    Description    = t.Description,
+                    StartDate      = t.StartDate,
+                    DueDate        = t.DueDate,
+                    EstimatedHours = t.EstimatedHours,
+                    Priority       = t.Priority,
+                    RequiredSkills = t.RequiredSkills,
+                    Subtasks       = new List<GeminiSubtaskDto>() // Level 3 không có con
+                }).ToList()
+            }).ToList();
+
+            // ⭐ BridgeEpicsToSubtasks kết thúc tại đây.
+            // epicAsSubtasks = danh sách Epic đã map thành SubtaskDto (có Subtasks lồng = Tasks)
+            // Cần dùng một object wrapper để truyền sang TaskDraftService
+            // Vì GeminiTaskDto đã bỏ Subtasks property, chúng ta sẽ truyền
+            // trực tiếp 'epicAsSubtasks' vào phương thức overload của TaskDraftService
+            // bằng cách tạo một GeminiTaskDto tạm với Epics set = source.Epics
+            // và dùng epicAsSubtasks làm tham số riêng (xem AskWithFileAsync)
+            return new GeminiTaskDto
+            {
+                Title          = source.Title,
+                Description    = source.Description,
+                StartDate      = source.StartDate,
+                EndDate        = source.EndDate,
+                EstimatedHours = source.EstimatedHours,
+                RequiredSkills = source.RequiredSkills,
+                Epics          = source.Epics, // giữ để response trả đúng
+                // ⚠️ Subtasks đã bị thay bởi Epics trong DTO mới
+                // TaskDraftService sẽ đọc Epics trực tiếp (xem fix bên dưới)
+            };
+        }
+
+        /// <summary>
+        /// Trả về epicAsSubtasks list để CreateDraftFromGeminiAsync dùng.
+        /// Tách riêng vì GeminiTaskDto không còn Subtasks property.
+        /// </summary>
+        private List<GeminiSubtaskDto> BuildEpicSubtaskList(GeminiTaskDto source)
+        {
+            return source.Epics.Select(epic => new GeminiSubtaskDto
+            {
+                Title          = epic.Title,
+                Description    = epic.Description,
+                StartDate      = epic.StartDate,
+                DueDate        = epic.DueDate,
+                EstimatedHours = epic.EstimatedHours,
+                Priority       = "Medium",
+                RequiredSkills = epic.RequiredSkills,
+                Subtasks       = epic.Tasks.Select(t => new GeminiSubtaskDto
+                {
+                    Title          = t.Title,
+                    Description    = t.Description,
+                    StartDate      = t.StartDate,
+                    DueDate        = t.DueDate,
+                    EstimatedHours = t.EstimatedHours,
+                    Priority       = t.Priority,
+                    RequiredSkills = t.RequiredSkills,
+                    Subtasks       = new List<GeminiSubtaskDto>()
+                }).ToList()
+            }).ToList();
         }
 
         public async Task<AgentDto?> CreateAsync(CreateAgentDto createAgentDto)
@@ -727,97 +774,232 @@ namespace DocTask.Service.Services
 
         private List<GeminiSubtaskDto> GenerateWorkPackages(DocTask.Service.Helpers.ModuleExtractor.ModuleInfo module, List<string> techStack, DateTime start, DateTime end)
         {
-            var packages = new List<GeminiSubtaskDto>();
-            var totalHours = (decimal)module.Hours;
-            var totalDays = (end - start).TotalDays;
-            
-            // Standard phases allocation
-            var standardPkgs = new [] 
+            var packages    = new List<GeminiSubtaskDto>();
+            var totalHours  = (decimal)module.Hours;
+            var totalDays   = (end - start).TotalDays;
+
+            // ⭐ ƯU TIÊN: nếu module có features thực tế (1.1, 1.2... từ tài liệu) thì dùng chúng
+            if (module.Features != null && module.Features.Count > 0)
+            {
+                Console.WriteLine($"  📋 [GenerateWorkPackages] Module '{module.Name}' có {module.Features.Count} features gốc → dùng làm tasks thực tế.");
+
+                var hoursPerTask = totalHours > 0
+                    ? Math.Round(totalHours / module.Features.Count, 1)
+                    : 8m;
+                var daysPerTask  = totalDays / module.Features.Count;
+                var taskStart    = start;
+
+                for (int idx = 0; idx < module.Features.Count; idx++)
+                {
+                    var feature = module.Features[idx];
+                    var taskEnd = (idx == module.Features.Count - 1)
+                        ? end  // task cuối kết thúc đúng epicEnd
+                        : taskStart.AddDays(Math.Max(0.5, daysPerTask));
+                    if (taskEnd > end) taskEnd = end;
+
+                    // Tự động map skill từ từ khóa trong tên feature
+                    var skillHint = InferSkillHintFromFeature(feature);
+
+                    packages.Add(new GeminiSubtaskDto
+                    {
+                        Title          = feature,
+                        Description    = $"{feature} - thuộc module {module.Name}",
+                        EstimatedHours = hoursPerTask,
+                        StartDate      = taskStart,
+                        DueDate        = taskEnd,
+                        Priority       = "Medium",
+                        // ⭐ Truyền feature text để MapSkills bổ sung skills đặc thù
+                        RequiredSkills = MapSkills(skillHint, techStack, feature)
+                    });
+
+                    taskStart = taskEnd;
+                }
+
+                return packages;
+            }
+
+            // Fallback: 5 phases cứng khi không có features từ tài liệu
+            Console.WriteLine($"  ⚠️ [GenerateWorkPackages] Module '{module.Name}' không có features → dùng 5 phases chuẩn.");
+            var standardPkgs = new[]
             {
                 new { Name = "Phân tích & Thiết kế", Ratio = 0.15m },
-                new { Name = "Backend Development", Ratio = 0.40m },
+                new { Name = "Backend Development",  Ratio = 0.40m },
                 new { Name = "Frontend Development", Ratio = 0.30m },
-                new { Name = "Testing", Ratio = 0.10m },
-                new { Name = "DevOps & Deploy", Ratio = 0.05m }
+                new { Name = "Testing",              Ratio = 0.10m },
+                new { Name = "DevOps & Deploy",      Ratio = 0.05m }
             };
 
             var currentPkgStart = start;
-            
             foreach (var pkg in standardPkgs)
             {
-                var pkgHours = totalHours * pkg.Ratio;
-                var pkgDurationDays = totalDays * (double)pkg.Ratio;
-                
-                // Ensure min duration
-                if (pkgDurationDays < 0.2) pkgDurationDays = 0.2; // Min ~2-3 hours
-                
-                var pkgEnd = currentPkgStart.AddDays(pkgDurationDays);
+                var pkgHours       = totalHours * pkg.Ratio;
+                var pkgDurationDays = Math.Max(0.2, totalDays * (double)pkg.Ratio);
+                var pkgEnd         = currentPkgStart.AddDays(pkgDurationDays);
                 if (pkgEnd > end) pkgEnd = end;
 
-                // Adjust overlaps slightly if needed, but sequential is fine for now
-                
-                var subtask = new GeminiSubtaskDto
+                packages.Add(new GeminiSubtaskDto
                 {
-                    Title = $"{pkg.Name}", // e.g. "Backend Development"
-                    Description = $"{pkg.Name} cho module {module.Name}",
+                    Title          = pkg.Name,
+                    Description    = $"{pkg.Name} cho module {module.Name}",
                     EstimatedHours = pkgHours,
-                    StartDate = currentPkgStart,
-                    DueDate = pkgEnd,
-                    RequiredSkills = MapSkills(pkg.Name, techStack)
-                };
-                packages.Add(subtask);
-                
-                currentPkgStart = pkgEnd; 
+                    StartDate      = currentPkgStart,
+                    DueDate        = pkgEnd,
+                    Priority       = "Medium",
+                    RequiredSkills = MapSkills(pkg.Name, techStack, pkg.Name)
+                });
+                currentPkgStart = pkgEnd;
             }
-            
+
             return packages;
         }
 
-        private List<GeminiSkillRequirementDTO> MapSkills(string pkgName, List<string> techStack)
+        /// <summary>
+        /// Suy luận loại skill cần thiết dựa trên từ khóa trong tên feature.
+        /// Thứ tự ưu tiên: Testing → DevOps → Frontend → Backend (tránh trùng từ khóa)
+        /// </summary>
+        private string InferSkillHintFromFeature(string featureName)
+        {
+            var f = featureName.ToLower();
+
+            // ⭐ 1. Testing — kiểm tra TRƯỚC để tránh bị Frontend/Backend lấy mất
+            // VD: "UI Testing", "Integration Testing", "Performance Testing"
+            if (f.Contains("testing") || f.Contains("test") || f.Contains(" qa") ||
+                f.Contains("selenium") || f.Contains("cypress") || f.Contains("jmeter") ||
+                f.Contains("performance test") || f.Contains("k6") ||
+                f.Contains("owasp") || f.Contains("coverage") || f.Contains("kiểm thử") ||
+                f.Contains("unit test") || f.Contains("integration test"))
+                return "Testing";
+
+            // ⭐ 2. DevOps — kiểm tra trước Frontend vì có "monitoring", "azure"
+            if (f.Contains("deploy") || f.Contains("ci/cd") || f.Contains("docker") ||
+                f.Contains("monitoring") || f.Contains("azure") || f.Contains("cloud") ||
+                f.Contains("triển khai") || f.Contains("github actions") ||
+                f.Contains("kubernetes") || f.Contains("pipeline") || f.Contains("container"))
+                return "DevOps";
+
+            // ⭐ 3. Frontend — giao diện, dashboard, báo cáo trực quan, cài đặt hệ thống
+            if (f.Contains("giao diện") || f.Contains("frontend") ||
+                f.Contains("dashboard") || f.Contains("form") || f.Contains("màn hình") ||
+                f.Contains("responsive") || f.Contains("component") || f.Contains("page") ||
+                f.Contains("trang quản") || f.Contains("hiển thị") || f.Contains("biểu đồ") ||
+                f.Contains("seo") || f.Contains("thống kê") || f.Contains("báo cáo") ||
+                f.Contains("cài đặt") || f.Contains("hồ sơ cá nhân") || f.Contains("banner") ||
+                f.Contains("bán chạy") || f.Contains("nổi bật"))
+                return "Frontend";
+
+            // ⭐ 4. Backend — mặc định cho hầu hết business logic
+            if (f.Contains("api") || f.Contains("database") || f.Contains("crud") ||
+                f.Contains("backend") || f.Contains("tích hợp") || f.Contains("jwt") ||
+                f.Contains("oauth") || f.Contains("otp") || f.Contains("token") ||
+                f.Contains("import") || f.Contains("export") || f.Contains("webhook") ||
+                f.Contains("email") || f.Contains("sms") || f.Contains("signalr"))
+                return "Backend";
+
+            // Mặc định Backend nếu không match bất kỳ từ khóa nào
+            return "Backend";
+        }
+
+
+        /// <summary>
+        /// Map skills dựa trên category (pkgName) + từ khóa đặc thù trong featureName.
+        /// VD: "Tích hợp VNPay" → Backend skills + Payment Integration
+        ///     "Upload file lên Azure" → Backend skills + Azure Blob Storage
+        /// </summary>
+        private List<GeminiSkillRequirementDTO> MapSkills(string pkgName, List<string> techStack, string featureName = "")
         {
             var skills = new List<GeminiSkillRequirementDTO>();
             var stack = techStack ?? new List<string>();
+            var f = featureName.ToLower();
 
+            // ⭐ BƯỚC 1: Thêm skills cơ bản theo category
             if (pkgName.Contains("Backend"))
             {
-                var keys = new[] { ".NET", "C#", "Java", "Python", "Node", "Go", "PHP", "SQL", "Entity", "Dapper" };
-                foreach(var t in stack) 
-                    if(keys.Any(k => t.IndexOf(k, StringComparison.OrdinalIgnoreCase) >= 0))
+                var keys = new[] { ".NET", "ASP", "C#", "Java", "Python", "Node", "Go", "PHP", "SQL", "Entity", "Dapper" };
+                foreach (var t in stack)
+                    if (keys.Any(k => t.IndexOf(k, StringComparison.OrdinalIgnoreCase) >= 0))
                         skills.Add(new GeminiSkillRequirementDTO { SkillName = t, RequiredLevel = 3, Importance = 5 });
-                
-                if (!skills.Any()) skills.Add(new GeminiSkillRequirementDTO { SkillName = "C# .NET", RequiredLevel = 3, Importance = 5 });
+
+                if (!skills.Any())
+                    skills.Add(new GeminiSkillRequirementDTO { SkillName = "C# .NET", RequiredLevel = 3, Importance = 5 });
             }
             else if (pkgName.Contains("Frontend"))
             {
-                var keys = new[] { "React", "Vue", "Angular", "HTML", "CSS", "JS", "TypeScript", "Tailwind", "Bootstrap" };
-                foreach(var t in stack) 
-                    if(keys.Any(k => t.IndexOf(k, StringComparison.OrdinalIgnoreCase) >= 0))
+                var keys = new[] { "React", "Vue", "Angular", "HTML", "CSS", "TypeScript", "Tailwind", "Bootstrap" };
+                foreach (var t in stack)
+                    if (keys.Any(k => t.IndexOf(k, StringComparison.OrdinalIgnoreCase) >= 0))
                         skills.Add(new GeminiSkillRequirementDTO { SkillName = t, RequiredLevel = 3, Importance = 5 });
 
-                if (!skills.Any()) skills.Add(new GeminiSkillRequirementDTO { SkillName = "ReactJS", RequiredLevel = 3, Importance = 5 });
+                if (!skills.Any())
+                    skills.Add(new GeminiSkillRequirementDTO { SkillName = "ReactJS", RequiredLevel = 3, Importance = 5 });
             }
             else if (pkgName.Contains("Testing"))
             {
-                 skills.Add(new GeminiSkillRequirementDTO { SkillName = "Software Testing", RequiredLevel = 3, Importance = 5 });
-                 if (stack.Any(s => s.Contains("Selenium") || s.Contains("Unit")))
-                    skills.Add(new GeminiSkillRequirementDTO { SkillName = "Automation Test", RequiredLevel = 3, Importance = 4 });
+                skills.Add(new GeminiSkillRequirementDTO { SkillName = "Software Testing", RequiredLevel = 3, Importance = 5 });
+                // Thêm tool-specific testing skills
+                if (f.Contains("cypress") || f.Contains("ui test") || f.Contains("selenium"))
+                    skills.Add(new GeminiSkillRequirementDTO { SkillName = "Cypress / Selenium", RequiredLevel = 3, Importance = 4 });
+                if (f.Contains("k6") || f.Contains("jmeter") || f.Contains("performance"))
+                    skills.Add(new GeminiSkillRequirementDTO { SkillName = "Performance Testing (k6)", RequiredLevel = 3, Importance = 4 });
+                if (f.Contains("owasp") || f.Contains("security test"))
+                    skills.Add(new GeminiSkillRequirementDTO { SkillName = "Security Testing", RequiredLevel = 3, Importance = 4 });
+                if (f.Contains("unit") || f.Contains("xunit") || f.Contains("nunit"))
+                    skills.Add(new GeminiSkillRequirementDTO { SkillName = "Unit Testing (xUnit)", RequiredLevel = 3, Importance = 4 });
             }
-            else if (pkgName.Contains("Design"))
+            else if (pkgName.Contains("Design") || pkgName.Contains("Phân tích") || pkgName.Contains("Thiết kế"))
             {
                 skills.Add(new GeminiSkillRequirementDTO { SkillName = "System Design", RequiredLevel = 4, Importance = 5 });
                 skills.Add(new GeminiSkillRequirementDTO { SkillName = "Database Design", RequiredLevel = 4, Importance = 5 });
             }
             else if (pkgName.Contains("DevOps"))
             {
-                var keys = new[] { "Docker", "Kubernetes", "AWS", "Azure", "CI/CD", "Jenkins", "Git" };
-                foreach(var t in stack) 
-                    if(keys.Any(k => t.IndexOf(k, StringComparison.OrdinalIgnoreCase) >= 0))
+                var keys = new[] { "Docker", "Kubernetes", "AWS", "Azure", "CI/CD", "Jenkins", "Git", "GitHub" };
+                foreach (var t in stack)
+                    if (keys.Any(k => t.IndexOf(k, StringComparison.OrdinalIgnoreCase) >= 0))
                         skills.Add(new GeminiSkillRequirementDTO { SkillName = t, RequiredLevel = 3, Importance = 5 });
-                
-                if (!skills.Any()) skills.Add(new GeminiSkillRequirementDTO { SkillName = "DevOps", RequiredLevel = 3, Importance = 5 });
+
+                if (!skills.Any())
+                    skills.Add(new GeminiSkillRequirementDTO { SkillName = "DevOps", RequiredLevel = 3, Importance = 5 });
             }
 
-            return skills.DistinctBy(s => s.SkillName).ToList();
+            // ⭐ BƯỚC 2: Bổ sung skills đặc thù từ nội dung feature (áp dụng cho mọi category)
+            // Thanh toán
+            if (f.Contains("vnpay") || f.Contains("momo") || f.Contains("thanh toán") || f.Contains("payment") || f.Contains("hóa đơn"))
+                skills.Add(new GeminiSkillRequirementDTO { SkillName = "Payment Integration", RequiredLevel = 3, Importance = 5 });
+
+            // Bảo mật / Auth
+            if (f.Contains("jwt") || f.Contains("oauth") || f.Contains("2fa") || f.Contains("otp") ||
+                f.Contains("bảo mật") || f.Contains("xác thực") || f.Contains("phân quyền") || f.Contains("token"))
+                skills.Add(new GeminiSkillRequirementDTO { SkillName = "Security / Authentication", RequiredLevel = 3, Importance = 4 });
+
+            // Realtime / SignalR
+            if (f.Contains("signalr") || f.Contains("real-time") || f.Contains("realtime") || f.Contains("thông báo"))
+                skills.Add(new GeminiSkillRequirementDTO { SkillName = "SignalR / Realtime", RequiredLevel = 3, Importance = 4 });
+
+            // Cloud Storage / Upload
+            if (f.Contains("upload") || f.Contains("azure blob") || f.Contains("storage") || f.Contains("cloud") || f.Contains("giấy tờ"))
+                skills.Add(new GeminiSkillRequirementDTO { SkillName = "Azure Blob Storage", RequiredLevel = 3, Importance = 4 });
+
+            // Video / Streaming
+            if (f.Contains("video") || f.Contains("streaming") || f.Contains("media"))
+                skills.Add(new GeminiSkillRequirementDTO { SkillName = "Video Streaming", RequiredLevel = 3, Importance = 4 });
+
+            // Email / SMS
+            if (f.Contains("email") || f.Contains("sms") || f.Contains("phiếu lương") || f.Contains("thư mời"))
+                skills.Add(new GeminiSkillRequirementDTO { SkillName = "Email / Notification Service", RequiredLevel = 2, Importance = 3 });
+
+            // QR Code / Barcode
+            if (f.Contains("qr") || f.Contains("barcode") || f.Contains("mã qr"))
+                skills.Add(new GeminiSkillRequirementDTO { SkillName = "QR Code Integration", RequiredLevel = 2, Importance = 3 });
+
+            // Excel / PDF Export
+            if (f.Contains("excel") || f.Contains("pdf") || f.Contains("xuất") || f.Contains("export"))
+                skills.Add(new GeminiSkillRequirementDTO { SkillName = "Report / Export (Excel/PDF)", RequiredLevel = 2, Importance = 3 });
+
+            // API tích hợp bên thứ 3
+            if (f.Contains("tích hợp") || f.Contains("api") || f.Contains("ghn") || f.Contains("ghtk") || f.Contains("webhook"))
+                skills.Add(new GeminiSkillRequirementDTO { SkillName = "Third-party API Integration", RequiredLevel = 3, Importance = 4 });
+
+            return skills.DistinctBy(s => s.SkillName).Take(4).ToList(); // Giới hạn 4 skills để không quá dài
         }
     }
 }

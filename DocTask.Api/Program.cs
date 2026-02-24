@@ -92,14 +92,13 @@ builder.Services.AddSingleton<Cloudinary>(sp =>
     return new Cloudinary(account);
 });
 
-// Configuration AI Providers (Ollama local + Gemini cloud fallback)
+// Configuration AI Provider — CHỈ dùng Ollama (local, miễn phí, unlimited)
+// Fallback: RuleBasedFallbackProvider (không cần API key)
 var aiProviderOptions = new DocTask.Core.Dtos.Gemini.AiProviderDto.AiProviderOptions
 {
-    // Ollama local server (primary) — chạy tại localhost
     OllamaBaseUrl = Environment.GetEnvironmentVariable("OLLAMA_BASE_URL") ?? "http://localhost:11434",
-    OllamaModel = Environment.GetEnvironmentVariable("OLLAMA_MODEL") ?? "qwen2.5:7b-instruct",
-    // Gemini cloud API (fallback) — dùng khi Ollama không khả dụng
-    GeminiApiKey = Environment.GetEnvironmentVariable("GEMINI_API_KEY") ?? ""
+    OllamaModel   = Environment.GetEnvironmentVariable("OLLAMA_MODEL")    ?? "qwen2.5:7b-instruct",
+    GeminiApiKey  = "" // Không dùng Gemini
 };
 builder.Services.AddSingleton(aiProviderOptions);
 

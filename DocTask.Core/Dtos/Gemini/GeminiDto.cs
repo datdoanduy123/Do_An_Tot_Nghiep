@@ -1,10 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Net.NetworkInformation;
-using System.Reflection.Metadata.Ecma335;
-using System.Threading.Tasks;
-using DocTask.Core.Dtos.Tasks;
 
 namespace DocTask.Core.Dtos.Gemini
 {
@@ -22,6 +18,9 @@ namespace DocTask.Core.Dtos.Gemini
             public int Importance { get; set; } = 2;
         }
 
+        /// <summary>
+        /// Level 1: Dự án tổng thể — root node của cây Draft
+        /// </summary>
         public class GeminiTaskDto
         {
             public string Title { get; set; } = "";
@@ -29,11 +28,15 @@ namespace DocTask.Core.Dtos.Gemini
             public DateTime StartDate { get; set; }
             public DateTime EndDate { get; set; }
             public decimal? EstimatedHours { get; set; }
-            public List<GeminiSkillRequirementDTO> RequiredSkills { get; set; } = new();    
-            public List<GeminiSubtaskDto> Subtasks { get; set; } = new();
+            public List<GeminiSkillRequirementDTO> RequiredSkills { get; set; } = new();
+            /// <summary>Danh sách Epic/Feature (Level 2)</summary>
+            public List<GeminiEpicDto> Epics { get; set; } = new();
         }
 
-        public class GeminiSubtaskDto
+        /// <summary>
+        /// Level 2: Epic / Feature — nhóm các Task liên quan
+        /// </summary>
+        public class GeminiEpicDto
         {
             public string Title { get; set; } = "";
             public string Description { get; set; } = "";
@@ -41,9 +44,23 @@ namespace DocTask.Core.Dtos.Gemini
             public DateTime DueDate { get; set; }
             public decimal? EstimatedHours { get; set; }
             public List<GeminiSkillRequirementDTO> RequiredSkills { get; set; } = new();
-            public string Frequency { get; set; } = "daily"; // daily/weekly/monthly
-            public List<int> AssignedUserIds { get; set; } = new();
-            public List<int> AssignedUnitIds { get; set; } = new();
+            /// <summary>Danh sách Task cụ thể (Level 3)</summary>
+            public List<GeminiSubtaskDto> Tasks { get; set; } = new();
+        }
+
+        /// <summary>
+        /// Level 3: Task cụ thể cần thực hiện
+        /// </summary>
+        public class GeminiSubtaskDto
+        {
+            public string Title { get; set; } = "";
+            public string Description { get; set; } = "";
+            public DateTime StartDate { get; set; }
+            public DateTime DueDate { get; set; }
+            public decimal? EstimatedHours { get; set; }
+            public string Priority { get; set; } = "Medium"; // Low / Medium / High
+            public List<GeminiSkillRequirementDTO> RequiredSkills { get; set; } = new();
+            /// <summary>Giữ lại để tương thích với code đệ quy cũ — luôn rỗng ở Level 3</summary>
             public List<GeminiSubtaskDto> Subtasks { get; set; } = new();
         }
 
@@ -268,197 +285,72 @@ namespace DocTask.Core.Dtos.Gemini
                     ",
 
                     PromptContextType.GenerateTasks => @"
-                    Bạn là AI chuyên gia lập kế hoạch dự án và phân rã công việc cho hệ thống quản lý công việc DocTask.
+Bạn là AI chuyên gia lập kế hoạch dự án. Phân tích tài liệu và sinh cấu trúc công việc 3 cấp.
 
-                    NHIỆM VỤ:
-                    - Phân tích nội dung tài liệu được cung cấp (file .docx, .pdf, .txt)
-                    - Sinh ra 01 TASK CHA (dự án tổng)
-                    - Sinh ra DANH SÁCH SUBTASKS chi tiết để thực hiện dự án
+QUY TẮC TUYỆT ĐỐI:
+- CHỈ trả về JSON hợp lệ, KHÔNG giải thích, KHÔNG markdown, KHÔNG text ngoài JSON
+- CHỈ dùng thông tin từ tài liệu; nếu thiếu thì suy luận hợp lý
 
-                    ⚠️ TUYỆT ĐỐI KHÔNG:
-                    - Không giải thích
-                    - Không bình luận
-                    - Không markdown
-                    - Không thêm text ngoài JSON
-                    - Không sinh dữ liệu không liên quan đến công việc thực thi
+CẤU TRÚC 3 CẤP:
+  Level 1 (project): Dự án tổng thể
+  Level 2 (epics):   3–8 Epic/Feature nhóm các chức năng
+  Level 3 (tasks):   3–10 Task cụ thể trong mỗi Epic
 
-                    ==================================================
-                    I. NGUYÊN TẮC PHÂN TÍCH
-                    ==================================================
+QUY TẮC THỜI GIAN:
+- startDate <= dueDate (KHÔNG đảo ngược)
+- Nếu không có ngày: startDate = ngày hiện tại, dueDate = startDate + 14 ngày
+- project.endDate = endDate của Epic cuối cùng
 
-                    1. CHỈ sử dụng thông tin có trong tài liệu
-                    2. Nếu thông tin không tồn tại → suy luận hợp lý dựa trên quy mô và nội dung tài liệu
-                    3. ƯU TIÊN các công việc thực thi:
-                       - Phân tích
-                       - Thiết kế
-                       - Phát triển
-                       - Kiểm thử
-                       - Triển khai
-                    4. TUYỆT ĐỐI BỎ QUA:
-                       - Báo cáo
-                       - Họp
-                       - Đánh giá
-                       - Quản lý hành chính
-                       (trừ khi đó là mục tiêu chính của tài liệu)
+QUY TẮC GIỜ (estimatedHours):
+- Task nhỏ: 4–16 giờ | Task trung bình: 16–40 giờ | Task lớn: 40–80 giờ
+- Epic.estimatedHours = tổng tasks trong epic
+- project.estimatedHours = tổng tất cả epics
 
-                    ==================================================
-                    II. QUY TẮC TẠO TASK CHA
-                    ==================================================
+QUY TẮC SKILL:
+- project: 5–8 skill TỔNG QUÁT (vd: Backend Development, Frontend Development)
+- epic: 3–5 skill TRUNG BÌNH
+- task: 2–4 skill CỤ THỂ (vd: C# .NET, ReactJS, SQL Server)
+- requiredLevel: 1=Beginner 2=Elementary 3=Intermediate 4=Advanced 5=Expert
+- importance: 1=Nice-to-have 2=Important 3=Critical
+- KHÔNG trùng skillName trong cùng node
 
-                    TASK CHA đại diện cho toàn bộ dự án.
+Nếu tài liệu KHÔNG có chức năng rõ ràng, BẮT BUỘC tạo epics mặc định:
+  Epic 1: Phân tích & Thiết kế hệ thống
+  Epic 2: Phát triển Backend API
+  Epic 3: Phát triển Frontend
+  Epic 4: Kiểm thử & Triển khai
 
-                    BẮT BUỘC PHẢI CÓ:
-                    - title: Lấy từ tiêu đề tài liệu
-                    - description: Tóm tắt mục tiêu dự án
-                    - startDate / endDate:
-                       - Nếu tài liệu có timeline → BẮT BUỘC dùng
-                       - Nếu không có:
-                           startDate = ngày hiện tại
-                           endDate = startDate + 45 ngày
-                    - estimatedHours:
-                       - BẰNG TỔNG estimatedHours của tất cả subtasks
-                    - requiredSkills:
-                       - Chỉ giữ 5–8 kỹ năng TỔNG QUÁT
-                       - Ví dụ:
-                         Web Development
-                         System Architecture
-                         Database Management
-                         Backend Development
-                         Frontend Development
-                         Software Testing
-                         Security Best Practices
-
-                    ==================================================
-                    III. CHIẾN LƯỢC BẮT BUỘC TẠO SUBTASK
-                    ==================================================
-
-                    ⚠️ TUYỆT ĐỐI KHÔNG được trả về subtasks rỗng.
-
-                    ÁP DỤNG THEO THỨ TỰ ƯU TIÊN:
-
-                    1. Nếu tài liệu có các mục chức năng rõ ràng:
-                       - Mỗi mục chức năng → 1 subtask
-                       - Ví dụ:
-                         ""Quản lý sinh viên""
-                         → ""Phát triển module Quản lý sinh viên""
-
-                    2. Nếu tài liệu KHÔNG chia sẵn chức năng:
-                       → BẮT BUỘC tạo tối thiểu các subtasks sau:
-                         1. Phân tích yêu cầu & thiết kế hệ thống
-                         2. Thiết kế cơ sở dữ liệu
-                         3. Phát triển Backend API
-                         4. Phát triển Frontend
-                         5. Kiểm thử & triển khai
-
-                    3. Mỗi subtask BẮT BUỘC PHẢI CÓ:
-                       - title
-                       - description
-                       - startDate
-                       - dueDate
-                       - estimatedHours
-                       - requiredSkills
-
-                    ==================================================
-                    IV. QUY TẮC THỜI GIAN
-                    ==================================================
-
-                    - startDate <= dueDate (KHÔNG được đảo ngược)
-                    - Nếu tài liệu KHÔNG có ngày cho subtask:
-                       startDate = ngày hiện tại
-                       dueDate = startDate + 14 ngày
-
-                    ==================================================
-                    V. QUY TẮC ƯỚC TÍNH GIỜ (estimatedHours)
-                    ==================================================
-
-                    - Subtask nhỏ: 8 – 24 giờ
-                    - Subtask trung bình: 32 – 80 giờ
-                    - Subtask lớn/phức tạp: 100 – 200 giờ
-
-                    KHÔNG tự cộng buffer.
-                    KHÔNG làm tròn số vô lý.
-
-                    ==================================================
-                    VI. QUY TẮC KỸ NĂNG (requiredSkills)
-                    ==================================================
-
-                    1. TASK CHA:
-                       - 5–8 kỹ năng tổng quát
-                       - Không dùng skill quá chi tiết
-
-                    2. SUBTASK:
-                       - 2–4 kỹ năng CỤ THỂ
-                       - Ví dụ:
-                         C# .NET
-                         ASP.NET Core
-                         React
-                         SQL Server
-                         UI/UX Design
-                         Docker
-
-                    3. KHÔNG trùng skillName trong cùng task
-                       - Nếu trùng → lấy requiredLevel CAO NHẤT
-                       - Lấy importance CAO NHẤT
-
-                    4. Quy ước:
-                       requiredLevel:
-                         1 = Beginner
-                         2 = Elementary
-                         3 = Intermediate
-                         4 = Advanced
-                         5 = Expert
-
-                       importance:
-                         1 = Nice to have
-                         2 = Important
-                         3 = Critical
-
-                    ==================================================
-                    VII. GIỚI HẠN & RÀNG BUỘC
-                    ==================================================
-
-                    - KHÔNG gán AssignedUserIds
-                    - KHÔNG gán AssignedUnitIds
-                    - KHÔNG sinh dữ liệu ngoài schema
-                    - KHÔNG để subtasks rỗng
-
-                    ==================================================
-                    VIII. ĐỊNH DẠNG ĐẦU RA (BẮT BUỘC)
-                    ==================================================
-
-                    CHỈ TRẢ VỀ JSON HỢP LỆ theo cấu trúc SAU:
-
-                    {
-                      ""title"": """",
-                      ""description"": """",
-                      ""startDate"": ""yyyy-MM-dd"",
-                      ""endDate"": ""yyyy-MM-dd"",
-                      ""estimatedHours"": 0,
-                      ""requiredSkills"": [
-                        {
-                          ""skillName"": """",
-                          ""requiredLevel"": 3,
-                          ""importance"": 2
-                        }
-                      ],
-                      ""subtasks"": [
-                        {
-                          ""title"": """",
-                          ""description"": """",
-                          ""startDate"": ""yyyy-MM-dd"",
-                          ""dueDate"": ""yyyy-MM-dd"",
-                          ""estimatedHours"": 0,
-                          ""requiredSkills"": [
-                            {
-                              ""skillName"": """",
-                              ""requiredLevel"": 3,
-                              ""importance"": 2
-                            }
-                          ]
-                        }
-                      ]
-                    }
-                    ",
+ĐỊNH DẠNG JSON BẮT BUỘC (KHÔNG thay đổi tên field):
+{
+  ""title"": ""Tên dự án"",
+  ""description"": ""Mô tả dự án"",
+  ""startDate"": ""yyyy-MM-dd"",
+  ""endDate"": ""yyyy-MM-dd"",
+  ""estimatedHours"": 0,
+  ""requiredSkills"": [{""skillName"": """", ""requiredLevel"": 3, ""importance"": 2}],
+  ""epics"": [
+    {
+      ""title"": ""Epic: Tên tính năng"",
+      ""description"": ""Mô tả epic"",
+      ""startDate"": ""yyyy-MM-dd"",
+      ""dueDate"": ""yyyy-MM-dd"",
+      ""estimatedHours"": 0,
+      ""requiredSkills"": [{""skillName"": """", ""requiredLevel"": 3, ""importance"": 2}],
+      ""tasks"": [
+        {
+          ""title"": ""Tên task cụ thể"",
+          ""description"": ""Mô tả task"",
+          ""startDate"": ""yyyy-MM-dd"",
+          ""dueDate"": ""yyyy-MM-dd"",
+          ""estimatedHours"": 8,
+          ""priority"": ""Medium"",
+          ""requiredSkills"": [{""skillName"": """", ""requiredLevel"": 3, ""importance"": 2}]
+        }
+      ]
+    }
+  ]
+}
+",
 
                     _ => "Trả lời tự nhiên, dễ hiểu",
                 };
