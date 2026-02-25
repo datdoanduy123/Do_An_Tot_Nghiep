@@ -112,6 +112,15 @@ namespace DocTask.Service.Services
                 // ⭐ Sinh Work Packages dưới dạng GeminiSubtaskDto (Level 3)
                 var tasks = GenerateWorkPackages(m, projectInfo.TechStack, epicStart, epicEnd);
 
+                // ⭐ A: Aggregate Epic skills từ child tasks (distinct, top 5 quan trọng nhất)
+                var epicSkills = tasks
+                    .SelectMany(t => t.RequiredSkills ?? new List<GeminiSkillRequirementDTO>())
+                    .GroupBy(s => s.SkillName)
+                    .Select(g => g.OrderByDescending(s => s.Importance).First())
+                    .OrderByDescending(s => s.Importance)
+                    .Take(5)
+                    .ToList();
+
                 epicsList.Add(new GeminiEpicDto
                 {
                     Title          = $"Epic: {m.Name}",
@@ -119,12 +128,28 @@ namespace DocTask.Service.Services
                     EstimatedHours = m.Hours,
                     StartDate      = epicStart,
                     DueDate        = epicEnd,
-                    RequiredSkills = new List<GeminiSkillRequirementDTO>(),
+                    // ⭐ Dùng epic skills đã aggregate thay vì list rỗng
+                    RequiredSkills = epicSkills,
                     Tasks          = tasks
                 });
 
                 epicStart = epicEnd;
             }
+
+            // ⭐ B: Root task skills = top 5 skills phổ biến nhất trên toàn project
+            // Gom tất cả skills từ mọi epic, đếm tần suất → lấy top 5
+            var rootSkills = epicsList
+                .SelectMany(e => e.RequiredSkills ?? new List<GeminiSkillRequirementDTO>())
+                .GroupBy(s => s.SkillName)
+                .Select(g => new GeminiSkillRequirementDTO
+                {
+                    SkillName      = g.Key,
+                    RequiredLevel  = (int)g.Average(s => s.RequiredLevel),
+                    Importance     = g.Max(s => s.Importance) // lấy importance cao nhất
+                })
+                .OrderByDescending(s => s.Importance)
+                .Take(5)
+                .ToList();
 
             var aiTask = new GeminiTaskDto
             {
@@ -133,6 +158,8 @@ namespace DocTask.Service.Services
                 StartDate      = pStart,
                 EndDate        = pEnd,
                 EstimatedHours = (decimal)totalHours,
+                // ⭐ Root task có skills tổng hợp từ toàn bộ project
+                RequiredSkills = rootSkills,
                 Epics          = epicsList
             };
 
@@ -818,36 +845,43 @@ namespace DocTask.Service.Services
                 return packages;
             }
 
-            // Fallback: 5 phases cứng khi không có features từ tài liệu
-            Console.WriteLine($"  ⚠️ [GenerateWorkPackages] Module '{module.Name}' không có features → dùng 5 phases chuẩn.");
-            var standardPkgs = new[]
+            // ⭐ Fallback: Overlap scheduling model (thực tế hơn sequential)
+            // Design → BE bắt đầu sớm → FE delay 35% → Testing sau 80% → DevOps song song Testing
+            Console.WriteLine($"  ⚠️ [GenerateWorkPackages] Module '{module.Name}' không có features → dùng Overlap model.");
+
+            // Tỷ lệ offset bắt đầu (so với tổng duration của epic)
+            // và offset kết thúc — mô phỏng Finish-to-Start + Start-to-Start với lag thực tế
+            var overlapPhases = new[]
             {
-                new { Name = "Phân tích & Thiết kế", Ratio = 0.15m },
-                new { Name = "Backend Development",  Ratio = 0.40m },
-                new { Name = "Frontend Development", Ratio = 0.30m },
-                new { Name = "Testing",              Ratio = 0.10m },
-                new { Name = "DevOps & Deploy",      Ratio = 0.05m }
+                // Name,                    HoursRatio, StartOffset, EndOffset  (% của totalDays)
+                (Name: "Phân tích & Thiết kế", Hours: 0.12m, Start: 0.00, End: 0.20),
+                (Name: "Backend Development",  Hours: 0.38m, Start: 0.10, End: 0.65), // bắt đầu khi Design 50%
+                (Name: "Frontend Development", Hours: 0.28m, Start: 0.35, End: 0.85), // bắt đầu khi Backend 50%
+                (Name: "Testing & QA",         Hours: 0.14m, Start: 0.70, End: 0.95), // bắt đầu khi BE+FE ~80%
+                (Name: "DevOps & Deploy",      Hours: 0.08m, Start: 0.88, End: 1.00), // song song cuối Testing
             };
 
-            var currentPkgStart = start;
-            foreach (var pkg in standardPkgs)
+            foreach (var phase in overlapPhases)
             {
-                var pkgHours       = totalHours * pkg.Ratio;
-                var pkgDurationDays = Math.Max(0.2, totalDays * (double)pkg.Ratio);
-                var pkgEnd         = currentPkgStart.AddDays(pkgDurationDays);
-                if (pkgEnd > end) pkgEnd = end;
+                // Tính ngày bắt đầu/kết thúc dựa trên offset % của tổng epic duration
+                var phaseStart = start.AddDays(totalDays * phase.Start);
+                var phaseEnd   = start.AddDays(totalDays * phase.End);
+
+                // Clamp: không vượt ra ngoài epic boundary
+                if (phaseStart < start) phaseStart = start;
+                if (phaseEnd   > end)   phaseEnd   = end;
+                if (phaseEnd   <= phaseStart) phaseEnd = phaseStart.AddDays(1);
 
                 packages.Add(new GeminiSubtaskDto
                 {
-                    Title          = pkg.Name,
-                    Description    = $"{pkg.Name} cho module {module.Name}",
-                    EstimatedHours = pkgHours,
-                    StartDate      = currentPkgStart,
-                    DueDate        = pkgEnd,
-                    Priority       = "Medium",
-                    RequiredSkills = MapSkills(pkg.Name, techStack, pkg.Name)
+                    Title          = phase.Name,
+                    Description    = $"{phase.Name} cho module {module.Name}",
+                    EstimatedHours = Math.Round(totalHours * phase.Hours, 1),
+                    StartDate      = phaseStart,
+                    DueDate        = phaseEnd,
+                    Priority       = phase.Name.Contains("Backend") ? "High" : "Medium",
+                    RequiredSkills = MapSkills(phase.Name, techStack, phase.Name)
                 });
-                currentPkgStart = pkgEnd;
             }
 
             return packages;
