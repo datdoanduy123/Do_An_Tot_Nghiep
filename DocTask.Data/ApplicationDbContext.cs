@@ -60,8 +60,6 @@ public partial class ApplicationDbContext : DbContext
     
     public virtual DbSet<UserSkill> UserSkills { get; set; }
     
-    public virtual DbSet<TaskSkillRequirement> TaskSkillRequirements { get; set; }
-    
     public virtual DbSet<EmployeeProfile> EmployeeProfiles { get; set; }
     
     public virtual DbSet<EmployeeCluster> EmployeeClusters { get; set; }
@@ -72,9 +70,8 @@ public partial class ApplicationDbContext : DbContext
     
     public virtual DbSet<PerformanceReview> PerformanceReviews { get; set; }
 
-    // DbSets cho TaskDraft (AI Generated)
-    public virtual DbSet<TaskDraft> TaskDrafts { get; set; }
-    public virtual DbSet<TaskDraftSkill> TaskDraftSkills { get; set; }
+    // DbSet cho AI Rule — cấu hình rule sinh task từ DB
+    public virtual DbSet<AiTaskRule> AiTaskRules { get; set; }
 
 
 //     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
@@ -341,120 +338,7 @@ public partial class ApplicationDbContext : DbContext
                 .HasConstraintName("FK_ReportReview_User");
         });
 
-        // 8. TaskDraft Entity
-        modelBuilder.Entity<TaskDraft>(entity =>
-        {
-            entity.ToTable("task_draft");
 
-            entity.HasKey(e => e.DraftId);
-
-            entity.Property(e => e.DraftId).HasColumnName("draftId");
-            entity.Property(e => e.ParentDraftId).HasColumnName("parentDraftId");
-            entity.Property(e => e.FileId).HasColumnName("fileId");
-            entity.Property(e => e.CreatedBy).HasColumnName("createdBy");
-            
-            entity.Property(e => e.Title)
-                .HasMaxLength(500)
-                .HasColumnName("title");
-            
-            entity.Property(e => e.Description).HasColumnName("description");
-            entity.Property(e => e.StartDate).HasColumnName("startDate");
-            entity.Property(e => e.EndDate).HasColumnName("endDate");
-            
-            entity.Property(e => e.EstimatedHours)
-                .HasColumnType("decimal(10,2)")
-                .HasColumnName("estimatedHours");
-            
-            entity.Property(e => e.RawAIResponse).HasColumnName("rawAIResponse");
-            
-            entity.Property(e => e.Status)
-                .HasMaxLength(20)
-                .HasDefaultValue("Pending")
-                .HasColumnName("status");
-            
-            entity.Property(e => e.ReviewedBy).HasColumnName("reviewedBy");
-            entity.Property(e => e.ReviewedAt).HasColumnName("reviewedAt");
-            entity.Property(e => e.ReviewNotes).HasColumnName("reviewNotes");
-            entity.Property(e => e.CreatedTaskId).HasColumnName("createdTaskId");
-            
-            entity.Property(e => e.CreatedAt)
-                .HasDefaultValueSql("(getdate())")
-                .HasColumnName("createdAt");
-
-            // Relationships
-            entity.HasOne(d => d.ParentDraft)
-                .WithMany(p => p.InverseParentDraft)
-                .HasForeignKey(d => d.ParentDraftId)
-                .OnDelete(DeleteBehavior.NoAction) // Tránh cycle cascade delete
-                .HasConstraintName("FK_TaskDraft_Parent");
-
-            entity.HasOne(d => d.File)
-                .WithMany()
-                .HasForeignKey(d => d.FileId)
-                .OnDelete(DeleteBehavior.Cascade)
-                .HasConstraintName("FK_TaskDraft_File");
-
-            entity.HasOne(d => d.Creator)
-                .WithMany()
-                .HasForeignKey(d => d.CreatedBy)
-                .OnDelete(DeleteBehavior.Restrict) // Change to Restrict to avoid cycles
-                .HasConstraintName("FK_TaskDraft_Creator");
-
-            entity.HasOne(d => d.Reviewer)
-                .WithMany()
-                .HasForeignKey(d => d.ReviewedBy)
-                .OnDelete(DeleteBehavior.Restrict) // Change to Restrict to avoid cycles
-                .HasConstraintName("FK_TaskDraft_Reviewer");
-
-            entity.HasOne(d => d.CreatedTask)
-                .WithMany()
-                .HasForeignKey(d => d.CreatedTaskId)
-                .OnDelete(DeleteBehavior.SetNull)
-                .HasConstraintName("FK_TaskDraft_Task");
-        });
-
-        // 9. TaskDraftSkill Entity
-        modelBuilder.Entity<TaskDraftSkill>(entity =>
-        {
-            entity.ToTable("task_draft_skill");
-
-            entity.HasKey(e => e.DraftSkillId);
-
-            entity.Property(e => e.DraftSkillId).HasColumnName("draftSkillId");
-            entity.Property(e => e.DraftId).HasColumnName("draftId");
-            entity.Property(e => e.SkillId).HasColumnName("skillId");
-            
-            entity.Property(e => e.RequiredLevel).HasColumnName("requiredLevel");
-            entity.Property(e => e.Importance)
-                .HasDefaultValue(2)
-                .HasColumnName("importance");
-            
-            entity.Property(e => e.IsAIExtracted)
-                .HasDefaultValue(true)
-                .HasColumnName("isAIExtracted");
-            
-            entity.Property(e => e.CreatedAt)
-                .HasDefaultValueSql("(getdate())")
-                .HasColumnName("createdAt");
-
-            // Unique constraint
-            entity.HasIndex(e => new { e.DraftId, e.SkillId })
-                .IsUnique()
-                .HasDatabaseName("UQ_TaskDraftSkill_Draft_Skill");
-
-            // Relationships
-            entity.HasOne(d => d.Draft)
-                .WithMany(p => p.DraftSkills)
-                .HasForeignKey(d => d.DraftId)
-                .OnDelete(DeleteBehavior.Cascade)
-                .HasConstraintName("FK_TaskDraftSkill_Draft");
-
-            entity.HasOne(d => d.Skill)
-                .WithMany()
-                .HasForeignKey(d => d.SkillId)
-                .OnDelete(DeleteBehavior.Cascade)
-                .HasConstraintName("FK_TaskDraftSkill_Skill");
-        });
 
         modelBuilder.Entity<Reportsummary>(entity =>
         {
@@ -847,46 +731,6 @@ public partial class ApplicationDbContext : DbContext
 
         });
         
-        // 3. TaskSkillRequirement Entity
-        modelBuilder.Entity<TaskSkillRequirement>(entity =>
-        {
-            entity.ToTable("task_skill_requirement");
-            
-            entity.HasKey(e => e.TaskSkillRequirementId);
-            
-            entity.Property(e => e.TaskSkillRequirementId).HasColumnName("taskSkillRequirementId");
-            entity.Property(e => e.TaskId).HasColumnName("taskId");
-            entity.Property(e => e.SkillId).HasColumnName("skillId");
-            
-            entity.Property(e => e.RequiredLevel)
-                .HasColumnName("requiredLevel");
-            
-            entity.Property(e => e.Importance)
-                .HasDefaultValue(2)
-                .HasColumnName("importance");
-            
-            entity.Property(e => e.IsAutoExtracted)
-                .HasDefaultValue(false)
-                .HasColumnName("isAutoExtracted");
-            
-            entity.Property(e => e.CreatedAt)
-                .HasDefaultValueSql("(getdate())")
-                .HasColumnType("datetime")
-                .HasColumnName("createdAt");
-            
-            // Relationships
-            entity.HasOne(d => d.Task)
-                .WithMany(p => p.SkillRequirements)
-                .HasForeignKey(d => d.TaskId)
-                .OnDelete(DeleteBehavior.Cascade)
-                .HasConstraintName("FK_TaskSkillRequirement_Task");
-            
-            entity.HasOne(d => d.Skill)
-                .WithMany(p => p.TaskSkillRequirements)
-                .HasForeignKey(d => d.SkillId)
-                .OnDelete(DeleteBehavior.Cascade)
-                .HasConstraintName("FK_TaskSkillRequirement_Skill");
-        });
         
         // 4. EmployeeProfile Entity
         modelBuilder.Entity<EmployeeProfile>(entity =>
@@ -1148,6 +992,120 @@ public partial class ApplicationDbContext : DbContext
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("FK_PerformanceReview_ReviewedBy");
         });
+
+        // ========== AiTaskRule Entity ==========
+        // Bảng cấu hình rule AI sinh task — thay thế hardcode trong RuleBasedFallbackProvider
+        modelBuilder.Entity<AiTaskRule>(entity =>
+        {
+            entity.ToTable("ai_task_rule");
+
+            entity.HasKey(e => e.RuleId);
+
+            entity.Property(e => e.RuleId).HasColumnName("ruleId");
+
+            entity.Property(e => e.RuleType)
+                .IsRequired()
+                .HasMaxLength(50)
+                .HasColumnName("ruleType");
+
+            entity.Property(e => e.Keyword)
+                .HasMaxLength(200)
+                .HasColumnName("keyword");
+
+            entity.Property(e => e.SkillName)
+                .HasMaxLength(200)
+                .HasColumnName("skillName");
+
+            entity.Property(e => e.RequiredLevel).HasColumnName("requiredLevel");
+
+            entity.Property(e => e.Importance).HasColumnName("importance");
+
+            entity.Property(e => e.PhaseName)
+                .HasMaxLength(200)
+                .HasColumnName("phaseName");
+
+            entity.Property(e => e.PhaseRatio)
+                .HasColumnType("decimal(5,4)")
+                .HasColumnName("phaseRatio");
+
+            entity.Property(e => e.PhaseHours).HasColumnName("phaseHours");
+
+            entity.Property(e => e.SortOrder)
+                .HasDefaultValue(0)
+                .HasColumnName("sortOrder");
+
+            entity.Property(e => e.IsActive)
+                .HasDefaultValue(true)
+                .HasColumnName("isActive");
+
+            entity.Property(e => e.CreatedAt)
+                .HasDefaultValueSql("(getdate())")
+                .HasColumnType("datetime")
+                .HasColumnName("createdAt");
+
+            entity.Property(e => e.UpdatedAt)
+                .HasColumnType("datetime")
+                .HasColumnName("updatedAt");
+
+            // Index để query nhanh theo RuleType + IsActive
+            entity.HasIndex(e => new { e.RuleType, e.IsActive })
+                .HasDatabaseName("IX_AiTaskRule_Type_Active");
+        });
+
+        // ========== Seed Data — Toàn bộ rule hiện đang hardcode ==========
+        modelBuilder.Entity<AiTaskRule>().HasData(
+            // === DefaultPhase: 5 phases mặc định khi không có module ===
+            new AiTaskRule { RuleId =  1, RuleType = "DefaultPhase", PhaseName = "Phân tích & Thiết kế",  PhaseRatio = 0.20, PhaseHours = 40,  SortOrder = 1, IsActive = true, CreatedAt = new DateTime(2026, 3, 1) },
+            new AiTaskRule { RuleId =  2, RuleType = "DefaultPhase", PhaseName = "Phát triển Backend",   PhaseRatio = 0.30, PhaseHours = 80,  SortOrder = 2, IsActive = true, CreatedAt = new DateTime(2026, 3, 1) },
+            new AiTaskRule { RuleId =  3, RuleType = "DefaultPhase", PhaseName = "Phát triển Frontend",  PhaseRatio = 0.30, PhaseHours = 80,  SortOrder = 3, IsActive = true, CreatedAt = new DateTime(2026, 3, 1) },
+            new AiTaskRule { RuleId =  4, RuleType = "DefaultPhase", PhaseName = "Kiểm thử (Testing)",   PhaseRatio = 0.10, PhaseHours = 30,  SortOrder = 4, IsActive = true, CreatedAt = new DateTime(2026, 3, 1) },
+            new AiTaskRule { RuleId =  5, RuleType = "DefaultPhase", PhaseName = "Triển khai & Bàn giao", PhaseRatio = 0.10, PhaseHours = 20, SortOrder = 5, IsActive = true, CreatedAt = new DateTime(2026, 3, 1) },
+
+            // === SkillKeyword: keyword trong TechStack → skill ===
+            new AiTaskRule { RuleId =  6, RuleType = "SkillKeyword", Keyword = "ASP.NET",      SkillName = "ASP.NET Core",         RequiredLevel = 4, Importance = 3, SortOrder = 1, IsActive = true, CreatedAt = new DateTime(2026, 3, 1) },
+            new AiTaskRule { RuleId =  7, RuleType = "SkillKeyword", Keyword = ".NET CORE",    SkillName = "ASP.NET Core",         RequiredLevel = 4, Importance = 3, SortOrder = 2, IsActive = true, CreatedAt = new DateTime(2026, 3, 1) },
+            new AiTaskRule { RuleId =  8, RuleType = "SkillKeyword", Keyword = "C#",           SkillName = "C# .NET",              RequiredLevel = 4, Importance = 3, SortOrder = 3, IsActive = true, CreatedAt = new DateTime(2026, 3, 1) },
+            new AiTaskRule { RuleId =  9, RuleType = "SkillKeyword", Keyword = "NODEJS",       SkillName = "NodeJS",               RequiredLevel = 4, Importance = 3, SortOrder = 4, IsActive = true, CreatedAt = new DateTime(2026, 3, 1) },
+            new AiTaskRule { RuleId = 10, RuleType = "SkillKeyword", Keyword = "NODE.JS",      SkillName = "NodeJS",               RequiredLevel = 4, Importance = 3, SortOrder = 5, IsActive = true, CreatedAt = new DateTime(2026, 3, 1) },
+            new AiTaskRule { RuleId = 11, RuleType = "SkillKeyword", Keyword = "JAVA",         SkillName = "Java/Spring",          RequiredLevel = 4, Importance = 3, SortOrder = 6, IsActive = true, CreatedAt = new DateTime(2026, 3, 1) },
+            new AiTaskRule { RuleId = 12, RuleType = "SkillKeyword", Keyword = "SPRING",       SkillName = "Java/Spring",          RequiredLevel = 4, Importance = 3, SortOrder = 7, IsActive = true, CreatedAt = new DateTime(2026, 3, 1) },
+            new AiTaskRule { RuleId = 13, RuleType = "SkillKeyword", Keyword = "REACT",        SkillName = "React",                RequiredLevel = 4, Importance = 2, SortOrder = 8, IsActive = true, CreatedAt = new DateTime(2026, 3, 1) },
+            new AiTaskRule { RuleId = 14, RuleType = "SkillKeyword", Keyword = "ANGULAR",      SkillName = "Angular",              RequiredLevel = 4, Importance = 2, SortOrder = 9, IsActive = true, CreatedAt = new DateTime(2026, 3, 1) },
+            new AiTaskRule { RuleId = 15, RuleType = "SkillKeyword", Keyword = "VUE",          SkillName = "Vue",                  RequiredLevel = 4, Importance = 2, SortOrder = 10, IsActive = true, CreatedAt = new DateTime(2026, 3, 1) },
+            new AiTaskRule { RuleId = 16, RuleType = "SkillKeyword", Keyword = "SQL SERVER",   SkillName = "SQL Server",           RequiredLevel = 3, Importance = 2, SortOrder = 11, IsActive = true, CreatedAt = new DateTime(2026, 3, 1) },
+            new AiTaskRule { RuleId = 17, RuleType = "SkillKeyword", Keyword = "MSSQL",        SkillName = "SQL Server",           RequiredLevel = 3, Importance = 2, SortOrder = 12, IsActive = true, CreatedAt = new DateTime(2026, 3, 1) },
+            new AiTaskRule { RuleId = 18, RuleType = "SkillKeyword", Keyword = "MYSQL",        SkillName = "MySQL",                RequiredLevel = 3, Importance = 2, SortOrder = 13, IsActive = true, CreatedAt = new DateTime(2026, 3, 1) },
+            new AiTaskRule { RuleId = 19, RuleType = "SkillKeyword", Keyword = "POSTGRES",     SkillName = "PostgreSQL",           RequiredLevel = 3, Importance = 2, SortOrder = 14, IsActive = true, CreatedAt = new DateTime(2026, 3, 1) },
+            new AiTaskRule { RuleId = 20, RuleType = "SkillKeyword", Keyword = "MONGODB",      SkillName = "MongoDB",              RequiredLevel = 3, Importance = 2, SortOrder = 15, IsActive = true, CreatedAt = new DateTime(2026, 3, 1) },
+            new AiTaskRule { RuleId = 21, RuleType = "SkillKeyword", Keyword = "JWT",          SkillName = "Security",             RequiredLevel = 3, Importance = 2, SortOrder = 16, IsActive = true, CreatedAt = new DateTime(2026, 3, 1) },
+            new AiTaskRule { RuleId = 22, RuleType = "SkillKeyword", Keyword = "OAUTH2",       SkillName = "Security",             RequiredLevel = 3, Importance = 2, SortOrder = 17, IsActive = true, CreatedAt = new DateTime(2026, 3, 1) },
+            new AiTaskRule { RuleId = 23, RuleType = "SkillKeyword", Keyword = "RBAC",         SkillName = "Security",             RequiredLevel = 3, Importance = 2, SortOrder = 18, IsActive = true, CreatedAt = new DateTime(2026, 3, 1) },
+            new AiTaskRule { RuleId = 24, RuleType = "SkillKeyword", Keyword = "DOCKER",       SkillName = "DevOps",               RequiredLevel = 3, Importance = 2, SortOrder = 19, IsActive = true, CreatedAt = new DateTime(2026, 3, 1) },
+            new AiTaskRule { RuleId = 25, RuleType = "SkillKeyword", Keyword = "CI/CD",        SkillName = "DevOps",               RequiredLevel = 3, Importance = 2, SortOrder = 20, IsActive = true, CreatedAt = new DateTime(2026, 3, 1) },
+            new AiTaskRule { RuleId = 26, RuleType = "SkillKeyword", Keyword = "DEVOPS",       SkillName = "DevOps",               RequiredLevel = 3, Importance = 2, SortOrder = 21, IsActive = true, CreatedAt = new DateTime(2026, 3, 1) },
+            new AiTaskRule { RuleId = 27, RuleType = "SkillKeyword", Keyword = "AZURE",        SkillName = "DevOps",               RequiredLevel = 3, Importance = 2, SortOrder = 22, IsActive = true, CreatedAt = new DateTime(2026, 3, 1) },
+            new AiTaskRule { RuleId = 28, RuleType = "SkillKeyword", Keyword = "UNIT TEST",    SkillName = "Software Testing",     RequiredLevel = 3, Importance = 2, SortOrder = 23, IsActive = true, CreatedAt = new DateTime(2026, 3, 1) },
+            new AiTaskRule { RuleId = 29, RuleType = "SkillKeyword", Keyword = "TESTING",      SkillName = "Software Testing",     RequiredLevel = 3, Importance = 2, SortOrder = 24, IsActive = true, CreatedAt = new DateTime(2026, 3, 1) },
+            new AiTaskRule { RuleId = 30, RuleType = "SkillKeyword", Keyword = "VNPAY",        SkillName = "Payment Integration",  RequiredLevel = 3, Importance = 2, SortOrder = 25, IsActive = true, CreatedAt = new DateTime(2026, 3, 1) },
+            new AiTaskRule { RuleId = 31, RuleType = "SkillKeyword", Keyword = "MOMO",         SkillName = "Payment Integration",  RequiredLevel = 3, Importance = 2, SortOrder = 26, IsActive = true, CreatedAt = new DateTime(2026, 3, 1) },
+            new AiTaskRule { RuleId = 32, RuleType = "SkillKeyword", Keyword = "STRIPE",       SkillName = "Payment Integration",  RequiredLevel = 3, Importance = 2, SortOrder = 27, IsActive = true, CreatedAt = new DateTime(2026, 3, 1) },
+            new AiTaskRule { RuleId = 33, RuleType = "SkillKeyword", Keyword = "ZALOPAY",      SkillName = "Payment Integration",  RequiredLevel = 3, Importance = 2, SortOrder = 28, IsActive = true, CreatedAt = new DateTime(2026, 3, 1) },
+
+            // === ModuleKeywordSkill: keyword trong TÊN module → skill ===
+            new AiTaskRule { RuleId = 34, RuleType = "ModuleKeywordSkill", Keyword = "API",         SkillName = "ASP.NET Core",        RequiredLevel = 4, Importance = 3, SortOrder = 1, IsActive = true, CreatedAt = new DateTime(2026, 3, 1) },
+            new AiTaskRule { RuleId = 35, RuleType = "ModuleKeywordSkill", Keyword = "API",         SkillName = "C# .NET",             RequiredLevel = 4, Importance = 3, SortOrder = 2, IsActive = true, CreatedAt = new DateTime(2026, 3, 1) },
+            new AiTaskRule { RuleId = 36, RuleType = "ModuleKeywordSkill", Keyword = "XỬ LÝ",       SkillName = "ASP.NET Core",        RequiredLevel = 4, Importance = 3, SortOrder = 3, IsActive = true, CreatedAt = new DateTime(2026, 3, 1) },
+            new AiTaskRule { RuleId = 37, RuleType = "ModuleKeywordSkill", Keyword = "GIAO DIỆN",   SkillName = "React",               RequiredLevel = 4, Importance = 2, SortOrder = 4, IsActive = true, CreatedAt = new DateTime(2026, 3, 1) },
+            new AiTaskRule { RuleId = 38, RuleType = "ModuleKeywordSkill", Keyword = "FRONTEND",    SkillName = "React",               RequiredLevel = 4, Importance = 2, SortOrder = 5, IsActive = true, CreatedAt = new DateTime(2026, 3, 1) },
+            new AiTaskRule { RuleId = 39, RuleType = "ModuleKeywordSkill", Keyword = "UI",          SkillName = "React",               RequiredLevel = 4, Importance = 2, SortOrder = 6, IsActive = true, CreatedAt = new DateTime(2026, 3, 1) },
+            new AiTaskRule { RuleId = 40, RuleType = "ModuleKeywordSkill", Keyword = "CSDL",        SkillName = "SQL Server",          RequiredLevel = 3, Importance = 2, SortOrder = 7, IsActive = true, CreatedAt = new DateTime(2026, 3, 1) },
+            new AiTaskRule { RuleId = 41, RuleType = "ModuleKeywordSkill", Keyword = "DATABASE",    SkillName = "SQL Server",          RequiredLevel = 3, Importance = 2, SortOrder = 8, IsActive = true, CreatedAt = new DateTime(2026, 3, 1) },
+            new AiTaskRule { RuleId = 42, RuleType = "ModuleKeywordSkill", Keyword = "THANH TOÁN",  SkillName = "Payment Integration", RequiredLevel = 3, Importance = 2, SortOrder = 9, IsActive = true, CreatedAt = new DateTime(2026, 3, 1) },
+            new AiTaskRule { RuleId = 43, RuleType = "ModuleKeywordSkill", Keyword = "PAYMENT",     SkillName = "Payment Integration", RequiredLevel = 3, Importance = 2, SortOrder = 10, IsActive = true, CreatedAt = new DateTime(2026, 3, 1) },
+            new AiTaskRule { RuleId = 44, RuleType = "ModuleKeywordSkill", Keyword = "BẢO MẬT",     SkillName = "Security",            RequiredLevel = 3, Importance = 2, SortOrder = 11, IsActive = true, CreatedAt = new DateTime(2026, 3, 1) },
+            new AiTaskRule { RuleId = 45, RuleType = "ModuleKeywordSkill", Keyword = "CI/CD",       SkillName = "DevOps",              RequiredLevel = 3, Importance = 2, SortOrder = 12, IsActive = true, CreatedAt = new DateTime(2026, 3, 1) },
+            new AiTaskRule { RuleId = 46, RuleType = "ModuleKeywordSkill", Keyword = "DOCKER",      SkillName = "DevOps",              RequiredLevel = 3, Importance = 2, SortOrder = 13, IsActive = true, CreatedAt = new DateTime(2026, 3, 1) }
+        );
 
         OnModelCreatingPartial(modelBuilder);
     }

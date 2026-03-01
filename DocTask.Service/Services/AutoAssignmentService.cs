@@ -7,20 +7,21 @@ using DocTask.Core.Interfaces.Repositories;
 using DocTask.Core.Interfaces.Services;
 using DocTask.Core.Models;
 using Microsoft.EntityFrameworkCore;
+using TaskModel = DocTask.Core.Models.Task;
 
 namespace DocTask.Service.Services
 {
+    /// <summary>
+    /// Service phân công tự động task cho nhân viên dựa trên workload hiện tại.
+    /// Lưu ý: TaskSkillRequirement đã bị xóa, việc scoring dựa trên availability.
+    /// </summary>
     public class AutoAssignmentService : IAutoAssignmentService
     {
         private readonly DocTask.Data.ApplicationDbContext _context;
         private readonly ITaskRepository _taskRepository;
 
-        // Weights for scoring
-        private const decimal WEIGHT_SKILL_MATCH = 0.5m;
-        private const decimal WEIGHT_AVAILABILITY = 0.5m;
-        
-        // Threshold to accept assignment
-        private const decimal ASSIGNMENT_THRESHOLD = 0.4m;
+        // Ngưỡng tối thiểu để chấp nhận phân công (availability score)
+        private const decimal ASSIGNMENT_THRESHOLD = 0.2m;
 
         public AutoAssignmentService(
             DocTask.Data.ApplicationDbContext context,
@@ -30,70 +31,28 @@ namespace DocTask.Service.Services
             _taskRepository = taskRepository;
         }
 
-        public async Task<List<AssignmentProposalDto>> ProposeAssignmentsForDraftAsync(int draftId)
-        {
-            // Get all tasks generated from this draft
-            var tasks = await _context.Tasks
-                .Include(t => t.SkillRequirements).ThenInclude(sr => sr.Skill)
-                .Where(t => 
-                    (t.ParentTaskId == null && _context.TaskDrafts.Any(d => d.DraftId == draftId && d.CreatedTaskId == t.TaskId)) ||
-                    t.ParentTask.IsAIGenerated // Simplify: check if part of AI generated hierarchy
-                )
-                .ToListAsync();
-
-            // Refine query to get EXACTLY tasks from this draft approval
-            // Since we link root draft -> root task via CreatedTaskId
-            var rootDraft = await _context.TaskDrafts.FindAsync(draftId);
-            if (rootDraft?.CreatedTaskId == null) return new List<AssignmentProposalDto>();
-            
-            var rootTaskId = rootDraft.CreatedTaskId.Value;
-            var allRelatedTasks = await _context.Tasks
-                .Include(t=>t.SkillRequirements).ThenInclude(sr=>sr.Skill)
-                .Where(t => t.TaskId == rootTaskId || t.ParentTaskId == rootTaskId || t.ParentTask.ParentTaskId == rootTaskId)
-                .ToListAsync();
-
-            var taskIds = allRelatedTasks.Select(t => t.TaskId).ToList();
-            return await ProposeAssignmentsAsync(taskIds);
-        }
-
+        /// <summary>
+        /// Đề xuất phân công cho danh sách taskIds dựa trên workload availability.
+        /// </summary>
         public async Task<List<AssignmentProposalDto>> ProposeAssignmentsAsync(List<int> taskIds)
         {
             var proposals = new List<AssignmentProposalDto>();
-            
-            // 1. Get Tasks with Requirements
+
+            // 1. Lấy danh sách Tasks cần xử lý
             var tasksToCheck = await _context.Tasks
-                .Include(t => t.SkillRequirements).ThenInclude(r => r.Skill)
                 .Where(t => taskIds.Contains(t.TaskId) && t.Status != "Done" && t.Status != "Completed")
                 .ToListAsync();
 
             if (!tasksToCheck.Any()) return proposals;
 
-            // 2. Get Active Employees with Profiles & Skills
+            // 2. Lấy danh sách nhân viên có EmployeeProfile
             var employees = await _context.Users
                 .Include(u => u.EmployeeProfile)
-                //.Include(u => u.UserSkills).ThenInclude(us => us.Skill) // Assuming navigation exists
-                .Where(u => u.EmployeeProfile != null) // Filter active
+                .Where(u => u.EmployeeProfile != null)
                 .ToListAsync();
-            
-            // Load UserSkills explicitly if include fails or to be safe
-            foreach(var emp in employees)
-            {
-                await _context.Entry(emp).Collection(u => u.UserSkills).LoadAsync();
-                foreach(var us in emp.UserSkills)
-                {
-                    await _context.Entry(us).Reference(x => x.Skill).LoadAsync();
-                }
-            }
 
             foreach (var task in tasksToCheck)
             {
-                // Skip task if no skill requirement (or assign to default PM?) -> Skip for now
-                if (!task.SkillRequirements.Any()) 
-                {
-                    // Fallback: Assign to random available or skip
-                    continue;
-                }
-
                 User? bestCandidate = null;
                 decimal bestScore = -1;
                 string bestReason = "";
@@ -103,48 +62,32 @@ namespace DocTask.Service.Services
                     var profile = emp.EmployeeProfile;
                     if (profile == null) continue;
 
-                    // --- Score 1: Skill Match ---
-                    decimal skillScore = CalculateSkillMatch(task.SkillRequirements.ToList(), emp.UserSkills.ToList());
-
-                    // --- Score 2: Availability ---
-                    // Capacity saturation: 1.0 (empty) -> 0.0 (full)
-                    // If Overload (> 100%), score is negative to discourage
-                    decimal currentLoad = profile.CurrentWorkloadHours; // Already stored in DB
+                    // --- Tính availability score ---
+                    // 1.0 = hoàn toàn rảnh, 0.0 = full tải, âm = quá tải
+                    decimal currentLoad = profile.CurrentWorkloadHours;
                     decimal capacity = profile.WeeklyCapacity > 0 ? profile.WeeklyCapacity : 40;
-                    
-                    decimal availabilityScore = 0;
-                    if (currentLoad >= capacity) 
-                    {
-                        availabilityScore = -0.1m; // Overloaded
-                    }
-                    else
-                    {
-                        availabilityScore = (capacity - currentLoad) / capacity; 
-                    }
 
-                    // Calculate AvailableHoursPerWeek for display
+                    decimal availabilityScore = currentLoad >= capacity
+                        ? -0.1m
+                        : (capacity - currentLoad) / capacity;
+
+                    // Cập nhật AvailableHoursPerWeek để hiển thị
                     profile.AvailableHoursPerWeek = capacity - currentLoad;
 
-                    // --- Final Weighted Score ---
-                    decimal finalScore = (skillScore * WEIGHT_SKILL_MATCH) + (availabilityScore * WEIGHT_AVAILABILITY);
-
-                    if (finalScore > bestScore)
+                    if (availabilityScore > bestScore)
                     {
-                        bestScore = finalScore;
+                        bestScore = availabilityScore;
                         bestCandidate = emp;
-                        bestReason = $"Skill match: {skillScore:P0}, Avail: {profile.AvailableHoursPerWeek:N1}h";
+                        bestReason = $"Availability: {profile.AvailableHoursPerWeek:N1}h còn trống";
                     }
                 }
 
                 if (bestCandidate != null && bestScore >= ASSIGNMENT_THRESHOLD)
                 {
-                    // Update predicted workload for this proposal run (greedy approach)
-                    // Allows distribution among team instead of piling on one superstar
+                    // Cộng dồn estimated hours vào workload để tránh dồn hết vào 1 người
                     if (bestCandidate.EmployeeProfile != null && task.EstimatedHours.HasValue)
                     {
-                         // Assuming task duration ~ 1 week for simplicity or add fractional
-                         // For V1, add full estimate to current load to penalize next assignment
-                         bestCandidate.EmployeeProfile.CurrentWorkloadHours += task.EstimatedHours.Value;
+                        bestCandidate.EmployeeProfile.CurrentWorkloadHours += task.EstimatedHours.Value;
                     }
 
                     proposals.Add(new AssignmentProposalDto
@@ -155,47 +98,12 @@ namespace DocTask.Service.Services
                         AssignedUserName = bestCandidate.FullName,
                         MatchScore = bestScore,
                         Reasoning = bestReason,
-                        PredictedUtilization = bestCandidate.EmployeeProfile?.CurrentWorkloadHours ?? 0 
+                        PredictedUtilization = bestCandidate.EmployeeProfile?.CurrentWorkloadHours ?? 0
                     });
                 }
             }
 
             return proposals;
-        }
-
-        private decimal CalculateSkillMatch(List<TaskSkillRequirement> required, List<UserSkill> userSkills)
-        {
-            if (!required.Any()) return 1.0m; // No reqs = 100% match
-
-            decimal totalWeight = 0;
-            decimal totalScore = 0;
-
-            foreach (var req in required)
-            {
-                var weight = req.Importance; // Default importance 1
-                totalWeight += weight;
-
-                var userSkill = userSkills.FirstOrDefault(us => 
-                    us.SkillId == req.SkillId || 
-                    (us.Skill.SkillName.ToLower().Contains(req.Skill.SkillName.ToLower())) // Loose match by name
-                );
-
-                if (userSkill != null)
-                {
-                    // Calculate ratio: UserLevel / ReqLevel
-                    // e.g. User 4 / Req 3 = 1.33 (Bonus)
-                    // User 2 / Req 3 = 0.66 (Penalty)
-                    decimal reqLevel = req.RequiredLevel > 0 ? req.RequiredLevel : 1;
-                    decimal userLevel = userSkill.ProficiencyLevel > 0 ? userSkill.ProficiencyLevel : 1; // Default stored as Level
-
-                    decimal ratio = userLevel / reqLevel;
-                    if (ratio > 1.2m) ratio = 1.2m; // Cap bonus at 120%
-
-                    totalScore += ratio * weight;
-                }
-            }
-
-            return totalWeight > 0 ? totalScore / totalWeight : 0;
         }
     }
 }

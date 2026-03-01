@@ -42,11 +42,6 @@ public interface ITaskService
     /// </summary>
     Task<TaskDto> AutoAssignByScoreAsync(int taskId, int userId);
 
-    /// <summary>
-    /// Trigger auto-assignment cho toàn bộ draft (smart engine).
-    /// </summary>
-    Task<List<AssignmentProposalDto>> AutoAssignDraftAsync(int draftId);
-
     // ===== SCHEDULE =====
 
     /// <summary>

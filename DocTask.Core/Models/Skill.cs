@@ -32,6 +32,4 @@ public partial class Skill
     
     // Navigation properties
     public virtual ICollection<UserSkill> UserSkills { get; set; } = new List<UserSkill>();
-    
-    public virtual ICollection<TaskSkillRequirement> TaskSkillRequirements { get; set; } = new List<TaskSkillRequirement>();
 }

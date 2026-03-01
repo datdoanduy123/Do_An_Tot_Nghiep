@@ -19,16 +19,20 @@ namespace DockTask.Api.Configurations
             // Đăng ký AiProviderFactory — trung tâm điều phối fallback
             services.AddScoped<AiProviderFactory>(sp =>
             {
-                var options = sp.GetRequiredService<AiProviderOptions>();
+                var options     = sp.GetRequiredService<AiProviderOptions>();
                 var httpFactory = sp.GetRequiredService<IHttpClientFactory>();
 
-                // Tạo danh sách providers theo thứ tự ưu tiên:
+                // Load rules AI từ DB — RuleBasedFallbackProvider không còn hardcode
+                var aiRuleRepo  = sp.GetRequiredService<IAiTaskRuleRepository>();
+                var allRules    = aiRuleRepo.GetAllAsync().GetAwaiter().GetResult();
+
+                // Providers theo thứ tự ưu tiên:
                 // 1. Ollama local (primary) — chạy miễn phí tại localhost
-                // 2. RuleBasedFallback — sinh task mặc định nếu Ollama lỗi
+                // 2. RuleBasedFallback — đọc rule từ DB, sinh task khi Ollama lỗi
                 var providers = new List<IAiProvider>
                 {
                     new OllamaAiProvider(httpFactory.CreateClient("OllamaHttpClient"), options),
-                    new RuleBasedFallbackProvider()
+                    new RuleBasedFallbackProvider(allRules)
                 };
 
                 return new AiProviderFactory(providers);
@@ -54,6 +58,9 @@ namespace DockTask.Api.Configurations
             services.AddScoped<IEmployeeClusteringService, EmployeeClusteringService>();
             services.AddScoped<IAutoAssignmentService, AutoAssignmentService>();
 
+            // Service quản lý rule cấu hình AI sinh task
+            services.AddScoped<IAiTaskRuleService, AiTaskRuleService>();
+
             // ===== Repositories =====
             services.AddScoped<IEmployeeProfileRepository, EmployeeProfileRepository>();
             services.AddScoped<IEmployeeClusterRepository, EmployeeClusterRepository>();
@@ -68,8 +75,8 @@ namespace DockTask.Api.Configurations
             services.AddScoped<IUnitRepository, UnitRepository>();
             services.AddScoped<IAgentRepository, AgentRepository>();
 
-            services.AddScoped<ITaskDraftRepository, TaskDraftRepository>();
-            services.AddScoped<ITaskDraftService, TaskDraftService>();
+            // Repository cho AI Rule — dị vụ cấu hình rule sinh task
+            services.AddScoped<IAiTaskRuleRepository, AiTaskRuleRepository>();
 
             return services;
         }

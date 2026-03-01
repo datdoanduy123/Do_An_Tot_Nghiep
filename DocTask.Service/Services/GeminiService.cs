@@ -28,7 +28,6 @@ namespace DocTask.Service.Services
         private readonly IFileConvertService _fileConvertService;
         private readonly IAgentRepository _agentRepository;
         private readonly IMemoryCache _memoryCache;
-        private readonly ITaskDraftService _taskDraftService;
         private const int FileContextChunkSize = 3000;
 
         /// <summary>
@@ -44,8 +43,7 @@ namespace DocTask.Service.Services
             ApplicationDbContext context,
             IFileConvertService fileConvertService,
             IMemoryCache memoryCache,
-            IAgentRepository agentRepository,
-            ITaskDraftService taskDraftService
+            IAgentRepository agentRepository
         )
         {
             _aiProviderFactory = aiProviderFactory;
@@ -57,7 +55,6 @@ namespace DocTask.Service.Services
             _fileConvertService = fileConvertService;
             _memoryCache = memoryCache;
             _agentRepository = agentRepository;
-            _taskDraftService = taskDraftService;
         }
 
         public async Task<ChatResponse> AskWithFileAsync(int fileId, int userId, bool redo = false)
@@ -163,13 +160,11 @@ namespace DocTask.Service.Services
                 Epics          = epicsList
             };
 
-            // TaskDraftService.CreateDraftFromGeminiAsync sẽ tự xử lý Epics
-            var createdDraftId = await _taskDraftService.CreateDraftFromGeminiAsync(aiTask, fileId, userId);
-
+            // Trả về AiResponse trực tiếp (không còn lưu draft vào DB)
             return new ChatResponse
             {
                 Response  = $"Đã trích xuất thành công dự án \"{aiTask.Title}\" với {aiTask.Epics.Count} epic từ tài liệu.",
-                DraftId   = createdDraftId,
+                DraftId   = null,
                 AiResponse = aiTask
             };
         }
@@ -219,13 +214,11 @@ namespace DocTask.Service.Services
         // ⭐ LAYER 3: Merge và override với extracted timeline
         var merged = MergeChunkResponses(chunkResponses, projectStartDate, projectEndDate);
 
-        // Lưu vào Draft — TaskDraftService sẽ tự đọc Epics và lưu 3 level
-        var draftId = await _taskDraftService.CreateDraftFromGeminiAsync(merged, fileId, userId);
-
+        // Trả về AiResponse trực tiếp (không lưu draft vào DB)
         var response = new ChatResponse
         {
-            Response   = "Đã tạo bản nháp thành công",
-            DraftId    = draftId,
+            Response   = "Đã phân tích tài liệu thành công",
+            DraftId    = null,
             AiResponse = merged
         };
 

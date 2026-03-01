@@ -1,4 +1,5 @@
-﻿namespace DocTask.Core.Models;
+﻿using DocTask.Core.Enum;
+namespace DocTask.Core.Models;
 
 public partial class Task
 {
@@ -51,6 +52,7 @@ public partial class Task
     /// Task có được auto-assigned không?
     /// </summary>
     public bool IsAutoAssigned { get; set; } = false;
+    public TaskTypeEnum TaskType { get; set; }  
 
     public virtual User? Assignee { get; set; }
 
@@ -68,9 +70,7 @@ public partial class Task
 
     public virtual ICollection<User> Users { get; set; } = new List<User>();
     
-    // Navigation properties mới cho K-means và AI features
-    public virtual ICollection<TaskSkillRequirement> SkillRequirements { get; set; } = new List<TaskSkillRequirement>();
-    
+    // Navigation properties cho AI features
     public virtual ICollection<AssignmentHistory> AssignmentHistories { get; set; } = new List<AssignmentHistory>();
 
     public virtual Task? ParentTask { get; set; }

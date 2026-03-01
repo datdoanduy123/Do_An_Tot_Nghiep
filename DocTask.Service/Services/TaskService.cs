@@ -495,11 +495,6 @@ public class TaskService : ITaskService
     //  AUTO ASSIGN — Smart Engine Integration
     // ================================================================
 
-    public async Task<List<AssignmentProposalDto>> AutoAssignDraftAsync(int draftId)
-    {
-        return await _autoAssignmentService.ProposeAssignmentsForDraftAsync(draftId);
-    }
-
     /// <summary>
     /// Tự động gợi ý + gán người dựa trên rule-based scoring.
     /// Backward compatibility or single task usage.
