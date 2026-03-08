@@ -61,6 +61,16 @@ namespace DockTask.Api.Configurations
             // Service quản lý rule cấu hình AI sinh task
             services.AddScoped<IAiTaskRuleService, AiTaskRuleService>();
 
+            // ===== Pipeline AI Project Generation (Upload → Parse → Plan → Rule → Insert → Assign) =====
+            // DocumentTemplateParser: bóc tách tài liệu theo template (deterministic, không AI)
+            services.AddScoped<DocTask.Api.Services.DocumentTemplateParser>();
+            // AgilePlanner: convert sang cây Agile 4 tầng (Ollama + validate JSON + fallback)
+            services.AddScoped<DocTask.Api.Services.AgilePlanner>();
+            // AiRuleApplier: áp rule từ DB lên AgilePlanDto (SkillKeyword / ModuleKeyword / DefaultPhase)
+            services.AddScoped<DocTask.Api.Services.AiRuleApplier>();
+            // AiProjectGenerationService: orchestrator chính — điều phối toàn bộ 8 bước
+            services.AddScoped<IAiProjectGenerationService, DocTask.Api.Services.AiProjectGenerationService>();
+
             // ===== Repositories =====
             services.AddScoped<IEmployeeProfileRepository, EmployeeProfileRepository>();
             services.AddScoped<IEmployeeClusterRepository, EmployeeClusterRepository>();
