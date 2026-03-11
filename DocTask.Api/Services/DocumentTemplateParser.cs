@@ -31,6 +31,9 @@ public class DocumentTemplateParser
 
     /// <summary>
     /// Parse rawText từ file tài liệu thành DocumentExtractDto có cấu trúc.
+    /// Hỗ trợ 2 format:
+    ///   - Format cũ: "CHỨC NĂNG X: ..." (SampleProject.txt)
+    ///   - Format mới: "Biên bản dự án" với bảng Đội ngũ + Sprint (backward-compatible)
     /// </summary>
     /// <param name="rawText">Nội dung thuần text của file upload</param>
     /// <param name="sourceFileName">Tên file gốc (dùng cho metadata)</param>
@@ -55,6 +58,10 @@ public class DocumentTemplateParser
         dto.TechStack           = ExtractTechStack(content);
         dto.Functions           = ExtractFunctions(content, dto.ParseWarnings);
         dto.NonFunctionalRequirements = ExtractNFR(content);
+
+        // === Phần mới: parse thêm từ template biên bản dự án ===
+        dto.TeamMembers = ExtractTeamMembers(content);
+        dto.Sprints     = ExtractSprints(content, dto.ParseWarnings);
 
         return dto;
     }
@@ -140,26 +147,46 @@ public class DocumentTemplateParser
     // ================================================================
 
     /// <summary>
-    /// Parse phần "Công nghệ sử dụng:" — lấy từng dòng "- xxx"
+    /// Parse phần "Công nghệ sử dụng:" — hỗ trợ 2 dạng:
+    ///   1. Gach đầu dòng (format cũ): "- ASP.NET Core"
+    ///   2. Bảng (format biên bản mới): "Database\t| SQL Server" hoặc "Database\tSQL Server"
     /// </summary>
     private static List<string> ExtractTechStack(string content)
     {
         var result = new List<string>();
 
-        // Tìm block bắt đầu bằng "Công nghệ sử dụng:" cho đến khi gặp dòng trống hoặc section mới
-        var m = Regex.Match(content,
+        // ƯU TIÊN: tìm bảng công nghệ theo mẫu biên bản (Thành Phần | Công nghệ)
+        // Bảng thường bắt đầu với "Database", "Authentication", "Frontend", "Backend", "Cloud"
+        var tableMatches = Regex.Matches(content,
+            @"(?m)^\s*(Database|Authentication|Auth|Frontend|Backend|Cloud|Server|DevOps)\s*[|\t]\s*(.+?)\s*$",
+            RegexOptions.IgnoreCase);
+
+        if (tableMatches.Count > 0)
+        {
+            foreach (Match m in tableMatches)
+            {
+                var tech = NormalizeSpaces(m.Groups[2].Value);
+                // Bỏ các dòng trống (header của bảng như “Công nghệ”)
+                if (!string.IsNullOrWhiteSpace(tech) && tech.Length >= 2 && !tech.Equals("Công nghệ", StringComparison.OrdinalIgnoreCase))
+                    result.Add($"{m.Groups[1].Value.Trim()}: {tech}");
+            }
+            if (result.Any()) return result;
+        }
+
+        // FALLBACK: bên dưới dòng "Công nghệ sử dụng:" gạch đầu dòng (format cũ)
+        var m2 = Regex.Match(content,
             @"(?is)Công\s*nghệ\s*sử\s*dụng\s*:\s*\n((?:\s*[-–•]\s*.+\n?)+)");
 
-        if (!m.Success)
+        if (!m2.Success)
         {
-            // Fallback: "Tech stack:" / "Technology:"
-            m = Regex.Match(content,
+            // Thử thêm "Tech stack:" / "Technology:"
+            m2 = Regex.Match(content,
                 @"(?is)(?:Tech\s*[Ss]tack|Technology)\s*:\s*\n((?:\s*[-–•]\s*.+\n?)+)");
         }
 
-        if (m.Success)
+        if (m2.Success)
         {
-            var block = m.Groups[1].Value;
+            var block = m2.Groups[1].Value;
             foreach (Match item in Regex.Matches(block, @"(?m)^\s*[-–•]\s*(.+?)\s*$"))
             {
                 var tech = NormalizeSpaces(item.Groups[1].Value);
@@ -362,4 +389,192 @@ public class DocumentTemplateParser
     /// <summary>Tạo DateTime từ ngày/tháng/năm string</summary>
     private static DateTime ParseDate(string day, string month, string year)
         => new DateTime(int.Parse(year), int.Parse(month), int.Parse(day));
+
+    // ================================================================
+    // ĐỘI NGŨ DỰ ÁN (MỤC 2 BIÊN BẢN MỚI)
+    // ================================================================
+
+    /// <summary>
+    /// Parse bảng "Đội ngũ dự án" (Mục 2).
+    /// Nhận dạng các dòng có dạng: Tên \t Vai trò  hoặc  Tên | Vai trò
+    /// </summary>
+    private static List<TeamMemberDto> ExtractTeamMembers(string content)
+    {
+        var result = new List<TeamMemberDto>();
+
+        // Tìm block bắt đầu bằng "Đội ngũ dự án" hoặc "2. Đội ngũ"
+        var blockMatch = Regex.Match(content,
+            @"(?is)(?:Đội\s*ngũ\s*dự\s*án|\d+\.\s*Đội\s*ngũ)\s*\n(.+?)(?=\n\s*\d+\.|\n\s*[3-9]\.|\n\s*Giai\s*đoạn|\Z)");
+
+        if (!blockMatch.Success) return result;
+
+        var block = blockMatch.Groups[1].Value;
+
+        // Mỗi dòng dạng: Tên <tab/|> Vai trò
+        // Bỏ các dòng header (Tên thành viên / Vai trò)
+        foreach (Match row in Regex.Matches(block, @"(?m)^\s*([^|\t\n]+?)\s*[|\t]+\s*([^|\t\n]+?)\s*$"))
+        {
+            var name = NormalizeSpaces(row.Groups[1].Value);
+            var role = NormalizeSpaces(row.Groups[2].Value);
+
+            // Bỏ dòng header (Tên thành viên, Vai trò,...)
+            if (IsHeaderRow(name)) continue;
+            if (string.IsNullOrWhiteSpace(name) || name.Length < 2) continue;
+
+            result.Add(new TeamMemberDto { Name = name, Role = role });
+        }
+
+        return result;
+    }
+
+    // ================================================================
+    // SPRINT / GIAI ĐOẠN CÔNG VIỆC (MỤC 4 BIÊN BẢN MỚI)
+    // ================================================================
+
+    /// <summary>
+    /// Parse Mục 4 "Các giai đoạn công việc" của biên bản mới.
+    /// Cấu trúc: Giai đoạn N → Sprint N → bảng STT | Công việc | Loại | Người thực hiện
+    /// </summary>
+    private static List<SprintExtractDto> ExtractSprints(string content, List<string> warnings)
+    {
+        var sprints = new List<SprintExtractDto>();
+
+        // Tìm block "Các giai đoạn công việc" (Mục 4)
+        var sectionMatch = Regex.Match(content,
+            @"(?is)(?:\d+\.\s*)?Các\s*giai\s*đoạn\s*công\s*việc\s*\n(.+?)(?=\n\s*\d+\.\s*TIÊU\s*CHUẨN|\n\s*Quản\s*lý\s*dự\s*án|\Z)");
+
+        if (!sectionMatch.Success)
+        {
+            // Không có template mới, fallback về CHỨC NĂNG X cũ
+            return sprints;
+        }
+
+        var sectionBody = sectionMatch.Groups[1].Value;
+
+        // Tách từng khối "Giai đoạn N: (...)"
+        var phaseHeaders = Regex.Matches(sectionBody,
+            @"(?mi)^Giai\s*đoạn\s+(\d+)\s*:\s*(?:\(?.+?\)?)?\s*$");
+
+        for (int pi = 0; pi < phaseHeaders.Count; pi++)
+        {
+            if (!int.TryParse(phaseHeaders[pi].Groups[1].Value, out int phaseNum)) continue;
+
+            // Lấy body của giai đoạn này
+            var phaseBodyStart = phaseHeaders[pi].Index + phaseHeaders[pi].Length;
+            var phaseBodyEnd   = pi + 1 < phaseHeaders.Count
+                ? phaseHeaders[pi + 1].Index
+                : sectionBody.Length;
+            var phaseBody = sectionBody[phaseBodyStart..phaseBodyEnd];
+
+            // Tìm các Sprint trong giai đoạn này
+            var sprintHeaders = Regex.Matches(phaseBody,
+                @"(?mi)^Sprint\s+(\d+)\s*:\s*(.+?)\.?\s+Thời\s*gian\s*:\s*(\d{1,2})[/\-](\d{1,2})[/\-](\d{4})\s*[-–]\s*(\d{1,2})[/\-](\d{1,2})[/\-](\d{4})");
+
+            // Nếu không có thông tin ngày, thử format không có ngày
+            if (sprintHeaders.Count == 0)
+                sprintHeaders = Regex.Matches(phaseBody,
+                    @"(?mi)^Sprint\s+(\d+)\s*:\s*(.+?)\s*$");
+
+            for (int si = 0; si < sprintHeaders.Count; si++)
+            {
+                if (!int.TryParse(sprintHeaders[si].Groups[1].Value, out int sprintNum)) continue;
+
+                var sprintName = NormalizeSpaces(sprintHeaders[si].Groups[2].Value).TrimEnd('.');
+
+                // Parse ngày nếu có (groups 3-8)
+                DateTime? sprintStart = null;
+                DateTime? sprintEnd   = null;
+                if (sprintHeaders[si].Groups.Count >= 9 && sprintHeaders[si].Groups[3].Success)
+                {
+                    try
+                    {
+                        sprintStart = ParseDate(sprintHeaders[si].Groups[3].Value,
+                                                sprintHeaders[si].Groups[4].Value,
+                                                sprintHeaders[si].Groups[5].Value);
+                        sprintEnd   = ParseDate(sprintHeaders[si].Groups[6].Value,
+                                                sprintHeaders[si].Groups[7].Value,
+                                                sprintHeaders[si].Groups[8].Value);
+                    }
+                    catch { /* bỏ qua nếu parse ngày lỗi */ }
+                }
+
+                // Lấy body của sprint này
+                var sprintBodyStart = sprintHeaders[si].Index + sprintHeaders[si].Length;
+                var sprintBodyEnd   = si + 1 < sprintHeaders.Count
+                    ? sprintHeaders[si + 1].Index
+                    : phaseBody.Length;
+                var sprintBody = phaseBody[sprintBodyStart..sprintBodyEnd];
+
+                // Parse bảng công việc trong sprint
+                var tasks = ParseSprintTaskTable(sprintBody);
+
+                sprints.Add(new SprintExtractDto
+                {
+                    PhaseNumber  = phaseNum,
+                    SprintNumber = sprintNum,
+                    SprintName   = sprintName,
+                    StartDate    = sprintStart,
+                    EndDate      = sprintEnd,
+                    Tasks        = tasks
+                });
+            }
+        }
+
+        if (phaseHeaders.Count > 0 && !sprints.Any())
+            warnings.Add("Tìm thấy 'Giai đoạn' nhưng không parse được Sprint nào — kiểm tra lại định dạng.");
+
+        return sprints;
+    }
+
+    /// <summary>
+    /// Parse bảng công việc trong 1 Sprint:
+    /// STT | Công việc | Loại | Người thực hiện
+    /// </summary>
+    private static List<SprintTaskDto> ParseSprintTaskTable(string sprintBody)
+    {
+        var tasks = new List<SprintTaskDto>();
+
+        // Mỗi dòng: mã (1.1, 2.3...) + phần còn lại phân cách bằng \t hoặc |
+        foreach (Match row in Regex.Matches(sprintBody,
+            @"(?m)^\s*(\d+\.\d+)\s*[|\t]+\s*([^|\t\n]+?)\s*[|\t]+\s*([^|\t\n]*?)\s*[|\t]+\s*([^|\t\n]*?)\s*$"))
+        {
+            var code     = row.Groups[1].Value.Trim();
+            var title    = NormalizeSpaces(row.Groups[2].Value);
+            var type     = NormalizeSpaces(row.Groups[3].Value);
+            var assignee = NormalizeSpaces(row.Groups[4].Value);
+
+            if (string.IsNullOrWhiteSpace(title)) continue;
+
+            tasks.Add(new SprintTaskDto
+            {
+                Code         = code,
+                Title        = title,
+                Type         = string.IsNullOrWhiteSpace(type)     ? null : type,
+                AssigneeName = string.IsNullOrWhiteSpace(assignee) ? null : assignee
+            });
+        }
+
+        // Fallback: dòng chỉ có mã + tiêu đề (không có Loại / Người thực hiện)
+        if (!tasks.Any())
+        {
+            foreach (Match row in Regex.Matches(sprintBody,
+                @"(?m)^\s*(\d+\.\d+)\s+([^\n]+?)\s*$"))
+            {
+                var code  = row.Groups[1].Value.Trim();
+                var title = NormalizeSpaces(row.Groups[2].Value);
+                if (!string.IsNullOrWhiteSpace(title))
+                    tasks.Add(new SprintTaskDto { Code = code, Title = title });
+            }
+        }
+
+        return tasks;
+    }
+
+    /// <summary>Kiểm tra dòng có phải là header của bảng không (bỏ qua header)</summary>
+    private static bool IsHeaderRow(string text)
+    {
+        var headerKeywords = new[] { "tên", "vai trò", "thành viên", "name", "role", "member", "công việc", "loại", "stt" };
+        var lower = text.ToLowerInvariant();
+        return headerKeywords.Any(k => lower.Contains(k));
+    }
 }

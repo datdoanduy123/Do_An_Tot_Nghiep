@@ -64,27 +64,45 @@ public class AiProjectGenerationService : IAiProjectGenerationService
         // ── BƯỚC 1: Đọc rawText từ file upload ───────────────────────
         var rawText = await ReadRawTextAsync(file);
 
-        // ── BƯỚC 2: Parse template deterministic ─────────────────────
+        // ── BƯỚC 2: Parse template deterministic ─────────────────
         var extract = _parser.Parse(rawText, file.FileName);
         warnings.AddRange(extract.ParseWarnings);
 
-        // ── BƯỚC 3: Sinh Agile plan (Ollama + fallback) ───────────────
-        var agilePlan = await _planner.PlanAsync(extract, warnings);
-
-        // ── BƯỚC 4: Áp rule từ DB ─────────────────────────────────────
-        var allRules = await _ruleRepo.GetAllAsync();
-        _ruleApplier.Apply(agilePlan, extract, allRules, warnings);
-
-        // ── BƯỚC 5 & 6 & 7: Insert vào DB + Auto-assign ─────────────
-        var providerUsed = "Template+Ollama"; // Planner sẽ ghi warning nếu dùng fallback
         var stats = new GenerationStatsDto();
 
         using var transaction = await _context.Database.BeginTransactionAsync();
         try
         {
-            var projectTaskId = await InsertTreeAsync(
-                agilePlan, requestingUserId,
-                createdNodes, stats, warnings);
+            int projectTaskId;
+
+            if (extract.Sprints.Any())
+            {
+                // =======================================================
+                // NHANH MỚI: Biên bản dự án — tạo Task trực tiếp từ bảng Sprint
+                // Bỏ qua AgilePlanner và Ollama, assign theo tên người.
+                // =======================================================
+                warnings.Add($"Phát hiện {extract.Sprints.Count} Sprint từ biên bản — tạo Task trực tiếp (bỏ qua Ollama).");
+
+                projectTaskId = await InsertSprintTreeAsync(
+                    extract, requestingUserId, createdNodes, stats, warnings);
+            }
+            else
+            {
+                // =======================================================
+                // NHANH CŨ: CHỨC NĂNG X — AgilePlanner + Ollama + auto-assign
+                // =======================================================
+
+                // ── BƯỚC 3: Sinh Agile plan (Ollama + fallback) ────────
+                var agilePlan = await _planner.PlanAsync(extract, warnings);
+
+                // ── BƯỚC 4: Ảp rule từ DB ─────────────────────────
+                var allRules = await _ruleRepo.GetAllAsync();
+                _ruleApplier.Apply(agilePlan, extract, allRules, warnings);
+
+                // ── BƯỚC 5-7: Insert vào DB + Auto-assign ───────────
+                projectTaskId = await InsertTreeAsync(
+                    agilePlan, requestingUserId, createdNodes, stats, warnings);
+            }
 
             await transaction.CommitAsync();
 
@@ -93,8 +111,10 @@ public class AiProjectGenerationService : IAiProjectGenerationService
                 ProjectTaskId = projectTaskId,
                 CreatedNodes  = createdNodes,
                 Stats         = stats,
-                ProviderUsed  = warnings.Any(w => w.Contains("fallback", StringComparison.OrdinalIgnoreCase))
-                    ? "RuleBased (Ollama fallback)" : "Ollama",
+                ProviderUsed  = extract.Sprints.Any()
+                    ? "SprintTemplate (Biên bản trực tiếp)"
+                    : (warnings.Any(w => w.Contains("fallback", StringComparison.OrdinalIgnoreCase))
+                        ? "RuleBased (Ollama fallback)" : "Ollama"),
                 Warnings      = warnings
             };
         }
@@ -156,6 +176,162 @@ public class AiProjectGenerationService : IAiProjectGenerationService
             sb.AppendLine(para.InnerText);
         }
         return sb.ToString();
+    }
+
+    // ================================================================
+    // INSERT CÂY SPRINT VÀO DB (NHANH MỚI — BIÊN BẢN TRỰC TIẾP)
+    // ================================================================
+
+    /// <summary>
+    /// Tạo cây Task từ bảng Sprint trên biên bản:
+    ///   Project (1) → Giai đoạn/Sprint = Epic (n) → Công việc = Task (n)
+    /// Assign theo tên người trong bảng (match với User.FullName trong DB).
+    /// </summary>
+    private async Task<int> InsertSprintTreeAsync(
+        DocumentExtractDto extract,
+        int requestingUserId,
+        List<CreatedNodeDto> createdNodes,
+        GenerationStatsDto stats,
+        List<string> warnings)
+    {
+        // Tạo Project node gốc
+        var projectTask = new TaskModel
+        {
+            Title          = extract.ProjectName,
+            Description    = extract.ProjectDescription ?? extract.ProjectName,
+            StartDate      = extract.StartDate,
+            DueDate        = extract.EndDate,
+            TaskType       = TaskTypeEnum.Project,
+            ParentTaskId   = null,
+            IsAIGenerated  = true,
+            IsAutoAssigned = false,
+            Status         = "pending",
+            Priority       = "high",
+            AssignerId     = requestingUserId,
+            CreatedAt      = DateTime.Now
+        };
+        _context.Tasks.Add(projectTask);
+        await _context.SaveChangesAsync();
+        createdNodes.Add(MapToNode(projectTask, "Project", null, null));
+
+        // Tải tất cả users để tìm theo FullName
+        var allUsers = await _context.Users
+            .AsNoTracking()
+            .ToListAsync();
+
+        // Nhóm Sprint theo Phase → mỗi Phase tương ứng 1 Epic
+        var byPhase = extract.Sprints
+            .GroupBy(s => s.PhaseNumber)
+            .OrderBy(g => g.Key);
+
+        foreach (var phaseGroup in byPhase)
+        {
+            var firstSprint = phaseGroup.OrderBy(s => s.SprintNumber).First();
+            var lastSprint  = phaseGroup.OrderByDescending(s => s.SprintNumber).First();
+
+            // Tạo Epic node tương ứng Giai đoạn
+            var epicTask = new TaskModel
+            {
+                Title          = $"Giai đoạn {phaseGroup.Key}",
+                Description    = $"Giai đoạn {phaseGroup.Key} — {phaseGroup.Count()} Sprint",
+                StartDate      = firstSprint.StartDate ?? extract.StartDate,
+                DueDate        = lastSprint.EndDate   ?? extract.EndDate,
+                TaskType       = TaskTypeEnum.Epic,
+                ParentTaskId   = projectTask.TaskId,
+                IsAIGenerated  = true,
+                Status         = "pending",
+                Priority       = "medium",
+                AssignerId     = requestingUserId,
+                CreatedAt      = DateTime.Now
+            };
+            _context.Tasks.Add(epicTask);
+            await _context.SaveChangesAsync();
+            createdNodes.Add(MapToNode(epicTask, "Epic", projectTask.TaskId, null));
+            stats.EpicCount++;
+
+            foreach (var sprint in phaseGroup.OrderBy(s => s.SprintNumber))
+            {
+                // Tạo Story node tương ứng Sprint
+                var storyTask = new TaskModel
+                {
+                    Title          = $"Sprint {sprint.SprintNumber}: {sprint.SprintName}",
+                    Description    = sprint.SprintName,
+                    StartDate      = sprint.StartDate ?? extract.StartDate,
+                    DueDate        = sprint.EndDate   ?? extract.EndDate,
+                    TaskType       = TaskTypeEnum.Story,
+                    ParentTaskId   = epicTask.TaskId,
+                    IsAIGenerated  = true,
+                    Status         = "pending",
+                    Priority       = "medium",
+                    AssignerId     = requestingUserId,
+                    CreatedAt      = DateTime.Now
+                };
+                _context.Tasks.Add(storyTask);
+                await _context.SaveChangesAsync();
+                createdNodes.Add(MapToNode(storyTask, "Story", epicTask.TaskId, null));
+                stats.StoryCount++;
+
+                // Tạo từng Task từ bảng công việc
+                foreach (var sprintTask in sprint.Tasks)
+                {
+                    // Tìm assignee theo tên trong bảng
+                    var (assigneeId, assigneeName) = FindAssigneeByName(
+                        sprintTask.AssigneeName, allUsers, warnings);
+
+                    var dbTask = new TaskModel
+                    {
+                        Title          = $"[{sprintTask.Code}] {sprintTask.Title}",
+                        Description    = $"[{sprintTask.Type ?? "Task"}] {sprintTask.Title}",
+                        StartDate      = sprint.StartDate ?? extract.StartDate,
+                        DueDate        = sprint.EndDate   ?? extract.EndDate,
+                        TaskType       = TaskTypeEnum.Task,
+                        ParentTaskId   = storyTask.TaskId,
+                        IsAIGenerated  = true,
+                        IsAutoAssigned = false, // Assign theo biên bản, không phải tự động
+                        AssigneeId     = assigneeId,
+                        AssignerId     = requestingUserId,
+                        Status         = "pending",
+                        Priority       = "medium",
+                        CreatedAt      = DateTime.Now
+                    };
+                    _context.Tasks.Add(dbTask);
+                    await _context.SaveChangesAsync();
+
+                    // Ghi AssignmentHistory + taskassignees nếu assign được
+                    if (assigneeId.HasValue)
+                    {
+                        _context.AssignmentHistories.Add(new AssignmentHistory
+                        {
+                            TaskId           = dbTask.TaskId,
+                            AssignedToUserId = assigneeId.Value,
+                            AssignedByUserId = requestingUserId,
+                            AssignmentMethod = "SprintTemplate",
+                            MatchScore       = 1.0m, // Assign theo tên — match 100%
+                            AssignmentReason = $"[Biên bản] Giao việc trực tiếp: {sprintTask.AssigneeName}",
+                            AssignedAt       = DateTime.Now
+                        });
+                        await _context.SaveChangesAsync();
+
+                        // Ghi vào bảng taskassignees (composite PK: TaskId + UserId)
+                        // Không có model class riêng → dùng raw SQL
+                        await _context.Database.ExecuteSqlRawAsync(
+                            "INSERT INTO taskassignees (TaskId, UserId) VALUES ({0}, {1})",
+                            dbTask.TaskId, assigneeId.Value);
+
+                        stats.AssignedCount++;
+                    }
+                    else
+                    {
+                        stats.UnassignedCount++;
+                    }
+
+                    createdNodes.Add(MapToNode(dbTask, "Task", storyTask.TaskId, assigneeId, assigneeName));
+                    stats.TaskCount++;
+                }
+            }
+        }
+
+        return projectTask.TaskId;
     }
 
     // ================================================================
@@ -274,7 +450,7 @@ public class AiProjectGenerationService : IAiProjectGenerationService
                     _context.Tasks.Add(dbTask);
                     await _context.SaveChangesAsync();
 
-                    // Log reasoning vào AssignmentHistory nếu assign thành công
+                    // Log reasoning vào AssignmentHistory + taskassignees nếu assign thành công
                     if (assigneeId.HasValue)
                     {
                         var history = new AssignmentHistory
@@ -302,6 +478,14 @@ public class AiProjectGenerationService : IAiProjectGenerationService
                     }
 
                     await _context.SaveChangesAsync();
+
+                    // Ghi vào taskassignees sau khi SaveChanges (cần TaskId đã có từ DB)
+                    if (assigneeId.HasValue)
+                    {
+                        await _context.Database.ExecuteSqlRawAsync(
+                            "INSERT INTO taskassignees (TaskId, UserId) VALUES ({0}, {1})",
+                            dbTask.TaskId, assigneeId.Value);
+                    }
                     createdNodes.Add(MapToNode(dbTask, "Task", storyTask.TaskId, assigneeId, assigneeName, matchScore));
                     stats.TaskCount++;
                 }
@@ -453,4 +637,40 @@ public class AiProjectGenerationService : IAiProjectGenerationService
             AssignMatchScore = matchScore > 0 ? matchScore : null
         };
     }
+
+    /// <summary>
+    /// Tìm User trong DB theo tên người thực hiện ghi trong biên bản.
+    /// Chiến lược match (giảm dần độ nghiêm ngặt):
+    ///   1. FullName khớp chính xác (case-insensitive)
+    ///   2. FullName chứa tên cần tìm (hoặc ngược lại)
+    /// Trả null nếu không tìm thấy, ghi warning.
+    /// </summary>
+    private static (int? id, string? name) FindAssigneeByName(
+        string? assigneeName,
+        List<User> allUsers,
+        List<string> warnings)
+    {
+        // Không có tên trong bảng → chưa phân công
+        if (string.IsNullOrWhiteSpace(assigneeName))
+            return (null, null);
+
+        var target = assigneeName.Trim();
+
+        // Bước 1: Khớp chính xác FullName
+        var exact = allUsers.FirstOrDefault(u =>
+            string.Equals(u.FullName?.Trim(), target, StringComparison.OrdinalIgnoreCase));
+        if (exact != null) return (exact.UserId, exact.FullName);
+
+        // Bước 2: Khớp một phần (FullName chứa target hoặc ngược lại)
+        var partial = allUsers.FirstOrDefault(u =>
+            u.FullName != null &&
+            (u.FullName.Contains(target, StringComparison.OrdinalIgnoreCase) ||
+             target.Contains(u.FullName, StringComparison.OrdinalIgnoreCase)));
+        if (partial != null) return (partial.UserId, partial.FullName);
+
+        // Không tìm thấy → cảnh báo để PM biết cần tạo tài khoản
+        warnings.Add($"Không tìm thấy user '{assigneeName}' trong DB — task sẽ không được assign.");
+        return (null, null);
+    }
 }
+
