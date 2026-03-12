@@ -1,4 +1,8 @@
-<div class="detailviecquanly-card" (click)="navigateToDetailChild()">
+<div
+  class="detailviecquanly-card"
+  [class.max-depth]="!canNavigateChild"
+  (click)="navigateToDetailChild()"
+>
   <i class="fa-regular fa-clipboard"></i>
   <div class="content">
     <div class="task-title">{{ detailViecquanlyModel.Title }}</div>

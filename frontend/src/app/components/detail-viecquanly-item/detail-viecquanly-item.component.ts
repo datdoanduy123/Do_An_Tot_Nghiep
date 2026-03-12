@@ -86,6 +86,7 @@ export class DetailViecquanlyItemComponent implements OnInit {
   isEditDespTask = true;
   isEditDateTimeTask = false;
   isEditFrequencyTask = false;
+  private readonly maxDepth = 3;
   constructor(
     private toastService: ToastService,
     private router: Router,
@@ -139,8 +140,21 @@ confirmDelete() {
       relativeTo: this.route,
     });
   }
+  get canNavigateChild(): boolean {
+    return this.getCurrentDepth() < this.maxDepth;
+  }
   navigateToDetailChild() {
-    this.router.navigate(['/viecquanly/chitiet', this.detailViecquanlyModel.TaskId]);
+    const currentDepth = this.getCurrentDepth();
+    if (currentDepth >= this.maxDepth) return;
+    this.router.navigate(['/viecquanly/chitiet', this.detailViecquanlyModel.TaskId], {
+      queryParams: { depth: currentDepth + 1 },
+    });
+  }
+  private getCurrentDepth(): number {
+    const depthParam = this.route.snapshot.queryParamMap.get('depth');
+    const depth = Number(depthParam);
+    if (!Number.isFinite(depth) || depth <= 0) return 1;
+    return depth;
   }
   //----- convert ----
     convertDate(dateString: string): string {

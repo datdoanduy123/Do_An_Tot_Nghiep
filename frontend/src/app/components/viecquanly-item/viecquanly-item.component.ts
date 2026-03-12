@@ -251,7 +251,9 @@ handleEditDirect() {
     this.router.navigate(['/viecquanly/review', this.viecquanly.taskId]);
   }
   navigateToDetail() {
-    this.router.navigate(['/viecquanly/chitiet', this.viecquanly.taskId]);
+    this.router.navigate(['/viecquanly/chitiet', this.viecquanly.taskId], {
+      queryParams: { depth: 1 },
+    });
   }
   refreshDataPage() {}
 

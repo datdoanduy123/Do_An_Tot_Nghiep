@@ -13,6 +13,9 @@
   /* width: 80%; */
   /* max-width: 700px; */
 }
+.detailviecquanly-card.max-depth {
+  cursor: default;
+}
 .detailviecquanly-card:hover {
   box-shadow: 0 1px 6px rgba(0, 0, 0, 0.15);
   transition: all 0.2s ease-in-out;
