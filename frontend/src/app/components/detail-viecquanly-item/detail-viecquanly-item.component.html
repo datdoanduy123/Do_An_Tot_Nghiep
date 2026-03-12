@@ -1,4 +1,4 @@
-<div class="detailviecquanly-card">
+<div class="detailviecquanly-card" (click)="navigateToDetailChild()">
   <i class="fa-regular fa-clipboard"></i>
   <div class="content">
     <div class="task-title">{{ detailViecquanlyModel.Title }}</div>
@@ -23,7 +23,8 @@
           nz-popover
           nzPopoverTitle="Người/Đơn vị thực hiện"
           nzPopoverTrigger="click"
-          [nzPopoverContent]="contentTemplate">
+          [nzPopoverContent]="contentTemplate"
+          (click)="$event.stopPropagation()">
           👥 Người thực hiện
         </div>
         <ng-template #contentTemplate>
@@ -57,7 +58,12 @@
         </ng-template>
       </div>
       <div class="container-button-frequency">
-        <a nz-dropdown nzTrigger="click" [nzDropdownMenu]="menu">
+        <a
+          nz-dropdown
+          nzTrigger="click"
+          [nzDropdownMenu]="menu"
+          (click)="$event.stopPropagation()"
+        >
           <div class="center-flex">
             <ng-container
               *ngIf="
@@ -85,7 +91,7 @@
         </nz-dropdown-menu>
       </div>
       <div class="container-button-desp">
-        <div class="desp-button" (click)="showModalDesp()">
+        <div class="desp-button" (click)="showModalDesp(); $event.stopPropagation()">
           <span> 🔍 Nội dung </span>
         </div>
       </div>
@@ -107,7 +113,7 @@
         "
         nz-button
         nzType="primary"
-        (click)="goReviewPage()"
+        (click)="goReviewPage(); $event.stopPropagation()"
       >
         Rà soát
       </button>
@@ -122,7 +128,7 @@
         nz-button
         nzType="primary"
         class="m-b-10 border"
-        (click)="showModalEdit()"
+        (click)="showModalEdit(); $event.stopPropagation()"
       >
         Sửa
       </button>
@@ -131,18 +137,18 @@
     nz-button
     nzType="primary"
     class="btn-delete border"
-    (click)="toggleConfirm()"
+    (click)="toggleConfirm(); $event.stopPropagation()"
   >
     Xóa
   </button>
 
   <div class="confirm-box" *ngIf="showConfirm">
-    <button nz-button nzSize="small" (click)="cancelDelete()">Huỷ</button>
+    <button nz-button nzSize="small" (click)="cancelDelete(); $event.stopPropagation()">Huỷ</button>
     <button
       nz-button
       nzType="primary"
       nzSize="small"
-      (click)="confirmDelete()"
+      (click)="confirmDelete(); $event.stopPropagation()"
     >
       Xác nhận
     </button>
@@ -261,3 +267,4 @@
   </ng-template>
 </nz-modal>
 <!--  -->
+

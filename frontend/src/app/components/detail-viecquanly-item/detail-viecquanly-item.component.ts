@@ -139,6 +139,9 @@ confirmDelete() {
       relativeTo: this.route,
     });
   }
+  navigateToDetailChild() {
+    this.router.navigate(['/viecquanly/chitiet', this.detailViecquanlyModel.TaskId]);
+  }
   //----- convert ----
     convertDate(dateString: string): string {
     if (!dateString || dateString === '0001-01-01T00:00:00') return 'Chưa xác định';
