@@ -20,19 +20,43 @@ export interface AISubtask {
   dueDate: string;
 }
 
+export interface GenerateProjectResponse {
+  projectTaskId: number;
+  createdNodes: any[];
+  stats: {
+    epicCount: number;
+    storyCount: number;
+    taskCount: number;
+    assignedCount: number;
+    unassignedCount: number;
+  };
+  providerUsed: string;
+  warnings: string[];
+}
+
 @Injectable({
   providedIn: 'root',
 })
 export class AiAgentService {
   apiUrl: string;
+  apiUrlAI : string;
+
 
   constructor(private http: HttpClient) {
     this.apiUrl = `${environment.SERVICE_API}`;
+    this.apiUrlAI = `${environment.SERVICE_API_AI}`;
+  }
+
+  generateProject(file: File, requestingUserId: string): Observable<ResponseApi<GenerateProjectResponse>> {
+    const formData = new FormData();
+    formData.append('file', file);
+    const url = `${this.apiUrlAI}ai/generate-project?requestingUserId=${requestingUserId}`;
+    return this.http.post<ResponseApi<GenerateProjectResponse>>(url, formData);
   }
 
   // API AI tạo đề xuất công việc từ file
   generateTaskSuggestions(fileId: number): Observable<AITaskSuggestion> {
-    const url = `${this.apiUrl}chat/generate-tasks/${fileId}`;
+    const url = `${this.apiUrlAI}chat/generate-tasks/${fileId}`;
     
     return this.http.post<any>(url, {}).pipe(
   map((res) => {

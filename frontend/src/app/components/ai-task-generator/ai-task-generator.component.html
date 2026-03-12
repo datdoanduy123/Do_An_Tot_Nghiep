@@ -1,251 +1,52 @@
-<div *ngIf="isVisible" class="ai-generator-section">
-  <div class="ai-generator-header">
-    <h3>Tạo việc với AI</h3>
-    <button nz-button nzType="text" (click)="close()">
-      <i nz-icon nzType="close"></i>
+<div class="ai-task-generator-container">
+  <!-- File Upload Section -->
+  <div class="upload-section" *ngIf="currentStep === 0">
+    <nz-upload
+      nzType="drag"
+      [nzMultiple]="false"
+      [nzBeforeUpload]="beforeUpload"
+      (nzChange)="removeFile()"
+    >
+      <p class="ant-upload-drag-icon">
+        <span nz-icon nzType="inbox"></span>
+      </p>
+      <p class="ant-upload-text">Nhấp hoặc kéo file vào khu vực này để tải lên</p>
+      <p class="ant-upload-hint">
+        Hỗ trợ các định dạng file: PDF, DOC, DOCX, TXT. Dung lượng file tối đa 10MB.
+      </p>
+    </nz-upload>
+
+    <div *ngIf="fileName" class="file-info">
+      <span>File đã chọn: {{ fileName }}</span>
+      <button nz-button nzType="text" nzDanger (click)="removeFile()">
+        <span nz-icon nzType="delete"></span>
+      </button>
+    </div>
+
+    <button
+      nz-button
+      nzType="primary"
+      [disabled]="!selectedFile"
+      [nzLoading]="isProcessing"
+      (click)="generateWithAI()"
+      class="generate-btn"
+    >
+      <span nz-icon nzType="experiment"></span>
+      Giao việc bằng AI
     </button>
   </div>
 
-  <!-- Upload Section -->
-  <div *ngIf="!aiSuggestion && !isProcessing" class="upload-section">
-    <div class="upload-description">
-      <p>AI sẽ đọc và phân tích nội dung file để tạo ra các công việc phù hợp</p>
-    </div>
-    
-    <nz-upload
-      class="upload-area"
-      nzType="drag"
-      [nzMultiple]="false"
-      [nzShowUploadList]="false"
-      [nzBeforeUpload]="beforeUpload">
-      <p class="ant-upload-drag-icon">
-        <i nz-icon nzType="inbox"></i>
-      </p>
-      <p class="ant-upload-text">Kéo thả file vào đây hoặc click để chọn</p>
-      <p class="ant-upload-hint">Hỗ trợ các định dạng: PDF, DOC, DOCX, TXT</p>
-    </nz-upload>
-    
-    <div *ngIf="selectedFile" class="selected-file">
-      <div class="file-info">
-        <i nz-icon nzType="file-text"></i>
-        <span>{{ selectedFile.name }}</span>
-        <button nz-button nzType="text" nzSize="small" (click)="removeFile()">
-          <i nz-icon nzType="close"></i>
-        </button>
-      </div>
-      <small class="help-text">Chọn lại file khác nếu muốn thay đổi</small>
-      
-      <div class="upload-actions">
-        <button
-          nz-button
-          nzType="primary"
-          (click)="generateWithAI()"
-          [nzLoading]="isProcessing">
-          <i nz-icon nzType="thunderbolt"></i>
-          Tạo với AI
-        </button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Processing Section -->
+  <!-- Processing Steps Section -->
   <div *ngIf="isProcessing" class="processing-section">
-    <nz-spin nzSize="large">
-      <div class="processing-content">
-        <h4>AI đang phân tích file...</h4>
-        <p>Vui lòng đợi trong giây lát</p>
-      </div>
+    <nz-spin nzTip="AI đang xử lý, vui lòng chờ...">
+      <div class="spin-content"></div>
     </nz-spin>
   </div>
-
-  <!-- AI Suggestion Results -->
-  <div *ngIf="aiSuggestion && !isProcessing" class="suggestion-results">
-    <!-- Improved file info section layout with better spacing and alignment -->
-    <div class="suggestion-header">
-      <div class="header-content">
-        <div class="file-section">
-          <h4>AI đã tạo công việc từ file:</h4>
-          <div class="file-info-section">
-            <div class="file-details">
-              <i nz-icon nzType="file-text" class="file-icon"></i>
-              <span class="file-name">{{ fileName }}</span>
-              
-              <button 
-                *ngIf="canPreviewFile()"
-                nz-button 
-                nzType="link" 
-                nzSize="small"
-                (click)="previewUploadedFile()"
-                class="preview-btn">
-                xem file
-                <i nz-icon nzType="eye"></i>
-              
-              </button>
-              
-              <span *ngIf="!canPreviewFile()" class="file-type-indicator">
-                <i nz-icon nzType="info-circle"></i>
-                Không thể xem trước
-              </span>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Main Task Card -->
-    <nz-card class="main-task-card" nzTitle="📋 Công việc chính"
-      [nzExtra]="mainTaskActions">
-      <ng-template #mainTaskActions>
-        <div class="main-task-actions">
-          <button nz-button nzType="primary" nzSize="small"
-            (click)="assignParentTask()"
-            [disabled]="isParentAssigned"
-            class="assign-parent-btn">
-            <i nz-icon nzType="user-add"></i>
-            {{ isParentAssigned ? 'Đã giao việc cha' : 'Giao việc cha' }}
-          </button>
-        </div>
-      </ng-template>
-      
-      <div class="task-info">
-        <h3 class="task-title">{{ aiSuggestion.title }}</h3>
-        <div class="task-meta">
-          <!-- <nz-tag nzColor="blue">
-            <i nz-icon nzType="calendar"></i>
-            {{ aiSuggestion.startDate }} - {{ aiSuggestion.endDate }}
-          </nz-tag> -->
-          <nz-tag nzColor="orange">
-            <i nz-icon nzType="branches"></i>
-            {{ aiSuggestion.subtasks.length }} công việc con
-          </nz-tag>
-          <nz-tag [nzColor]="isParentAssigned ? 'green' : 'gold'">
-            <i nz-icon [nzType]="isParentAssigned ? 'check-circle' : 'clock-circle'"></i>
-            {{ isParentAssigned ? 'Đã giao việc cha' : 'Chưa giao việc cha' }}
-          </nz-tag>
-        </div>
-        <div class="task-description">
-          <h4>Mô tả:</h4>
-          <p>{{ aiSuggestion.description }}</p>
-        </div>
-      </div>
-    </nz-card>
-
-    <!-- Toggle Subtasks Button -->
-    <div class="subtasks-toggle-section">
-      <button nz-button nzType="default" nzSize="large"
-        class="toggle-subtasks-btn"
-        (click)="isSubtasksVisible = !isSubtasksVisible">
-        <i nz-icon [nzType]="isSubtasksVisible ? 'up' : 'down'"></i>
-        <span>
-          {{ isSubtasksVisible ? 'Ẩn' : 'Xem' }} công việc con ({{ aiSuggestion.subtasks.length }})
-        </span>
-      </button>
-    </div>
-
-    <!-- Subtasks Section -->
-    <div class="subtasks-section"
-      [class.visible]="isSubtasksVisible"
-      [class.hidden]="!isSubtasksVisible">
-      
-      <!-- Warning if parent task not assigned -->
-      <div *ngIf="isSubtasksVisible && !isParentAssigned" class="parent-warning">
-        <nz-alert
-          nzType="warning"
-          nzMessage="Vui lòng giao việc cha trước khi giao các việc con"
-          nzShowIcon>
-        </nz-alert>
-      </div>
-
-      <div class="subtasks-header" *ngIf="isSubtasksVisible">
-        <h3>Các công việc con được đề xuất</h3>
-        <span class="summary-text">
-          Tổng cộng {{ aiSuggestion.subtasks.length }} công việc con
-        </span>
-      </div>
-      
-      <div class="subtasks-list" *ngIf="isSubtasksVisible">
-        <nz-card *ngFor="let subtask of aiSuggestion.subtasks; let i = index"
-          class="subtask-card"
-          [class.disabled]="!isParentAssigned"
-          [nzTitle]="'Việc con ' + (i + 1) + ': ' + subtask.title"
-          [nzExtra]="subtaskActions">
-          <ng-template #subtaskActions>
-            <div class="subtask-actions">
-              <button nz-button nzType="primary" nzSize="small"
-                (click)="assignSubtask(subtask, i)"
-                [disabled]="!isParentAssigned"
-                class="assign-btn">
-                <i nz-icon nzType="user-add"></i>
-                Giao việc con
-              </button>
-            </div>
-          </ng-template>
-          
-          <div class="subtask-info">
-            <!-- <h4 class="subtask-title">{{ subtask.title }}</h4> -->
-            <div class="subtask-meta">
-              <nz-tag nzColor="cyan" nzSize="small">
-                <i nz-icon nzType="calendar"></i>
-                {{ subtask.startDate }} - {{ subtask.dueDate }}
-              </nz-tag>
-            </div>
-            <div class="subtask-description">
-              <h5>Mô tả:</h5>
-              <p>{{ subtask.description }}</p>
-            </div>
-          </div>
-        </nz-card>
-      </div>
-    </div>
-  </div>
-
 </div>
 
-<!-- Modal Giao Việc Cha -->
-<app-modal-add-job
-  (jobAdded)="handleParentJobAdded($event)">
-</app-modal-add-job>
-
-<app-modal-view-file></app-modal-view-file>
-
-<!-- Modal Giao Việc Con -->
-<nz-modal
-  [(nzVisible)]="showAssignModal"
-  (nzOnCancel)="closeAssignModal()"
-  [nzFooter]="null"
-  nzWidth="800px">
-  
-  <ng-container *nzModalContent>
-    <div *ngIf="prefilledTask" class="assign-modal-content">
-      <div class="ai-child-indicator">
-        <nz-tag nzColor="green">
-          <i nz-icon nzType="robot"></i>
-          Giao việc con từ AI - Parent ID: {{ assignedParentTaskId }}
-        </nz-tag>
-      </div>
-      
-      <edit-app-misson-item
-        [prefilledTask]="prefilledTask"
-        [isAiMode]="true"
-        [isParentTask]="false"
-        (taskAssigned)="handleTaskAssigned($event)"
-        (closeEdit)="closeAssignModal()">
-      </edit-app-misson-item>
-    </div>
-  </ng-container>
-   <!-- <ng-template #modalFooter>
-    <div class="modal-footer-actions">
-      <button nz-button nzType="default" (click)="closeAssignModal()">
-        Hủy bỏ
-      </button>
-      <button 
-        nz-button 
-        nzType="primary" 
-        (click)="confirmAssignSubtask()"
-        [nzLoading]="isAssigningSubtask">
-        <i nz-icon nzType="check"></i>
-        Xác nhận giao việc
-      </button>
-    </div>
-  </ng-template> -->
-</nz-modal>
+<!-- Modal to display AI-generated project -->
+<app-modal-ai-task-generator
+  [isVisible]="isResultModalVisible"
+  [generatedProject]="generatedProject"
+  (closeModal)="closeResultModal()"
+></app-modal-ai-task-generator>

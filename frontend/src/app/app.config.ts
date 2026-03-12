@@ -19,6 +19,8 @@ import { FormsModule } from '@angular/forms';
 import { provideAnimationsAsync } from '@angular/platform-browser/animations/async';
 import { ApiInterceptor } from './interceptor/api.interceptor';
 import vi from '@angular/common/locales/vi';
+import { NzModalModule } from 'ng-zorro-antd/modal';
+import { NzTreeModule } from 'ng-zorro-antd/tree';
 registerLocaleData(vi);
 
 import { NZ_I18N, vi_VN } from 'ng-zorro-antd/i18n';
@@ -42,7 +44,7 @@ export const appConfig: ApplicationConfig = {
       useClass: GlobalErrorService,
     },
     { provide: NZ_I18N, useValue: vi_VN },
-    importProvidersFrom(FormsModule),
+    importProvidersFrom(FormsModule, NzModalModule, NzTreeModule),
     provideAnimationsAsync(),
     provideHttpClient(),
   ],

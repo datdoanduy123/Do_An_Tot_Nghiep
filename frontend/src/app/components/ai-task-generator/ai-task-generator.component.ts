@@ -6,18 +6,20 @@ import { NzIconModule } from 'ng-zorro-antd/icon';
 import { NzSpinModule } from 'ng-zorro-antd/spin';
 import { NzCardModule } from 'ng-zorro-antd/card';
 import { NzTagModule } from 'ng-zorro-antd/tag';
-import { NzModalModule } from 'ng-zorro-antd/modal';
+import { NzModalModule, NzModalService } from 'ng-zorro-antd/modal';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { NzAlertModule } from 'ng-zorro-antd/alert';
 import { DocumentService } from '../../service/document.service';
-import { AiAgentService, AITaskSuggestion } from '../../service/ai-agent.service';
+import { AiAgentService, AITaskSuggestion, GenerateProjectResponse } from '../../service/ai-agent.service';
 import { ToastService } from '../../service/toast.service';
 import { TaskViewModel } from '../../models/task-view.model';
 import { EditMissonItemComponent } from '../edit-misson-item/edit-misson-item.component';
 import { AiTaskStorageService, AiTaskData } from '../../service/ai-task-storage.service';
 import { ModalAddJobComponent } from '../modal-add-job/modal-add-job.component';
 import { ModalViewFileComponent } from '../modal-view-file/modal-view-file.component';
-import { DocumentModel } from '../../models/document.model'; // 👈 NEW: Import DocumentModel
+import { DocumentModel } from '../../models/document.model';
+import { AuthService } from '../../service/auth.service';
+import { ModalAiTaskGeneratorComponent } from '../modal-ai-task-generator/modal-ai-task-generator.component';
 
 @Component({
   selector: 'app-ai-task-generator',
@@ -34,7 +36,8 @@ import { DocumentModel } from '../../models/document.model'; // 👈 NEW: Import
     NzAlertModule,
     EditMissonItemComponent,
     ModalAddJobComponent,
-    ModalViewFileComponent 
+    ModalViewFileComponent,
+    ModalAiTaskGeneratorComponent
   ],
   templateUrl: './ai-task-generator.component.html',
   styleUrl: './ai-task-generator.component.css'
@@ -72,13 +75,18 @@ export class AiTaskGeneratorComponent {
 
   uploadedDocument: DocumentModel | null = null;
 
+  generatedProject: GenerateProjectResponse | null = null;
+  isResultModalVisible = false;
+
   private destroyRef = inject(DestroyRef);
 
   constructor(
     private documentService: DocumentService,
     private aiAgentService: AiAgentService,
     private toastService: ToastService,
-    private aiTaskStorageService: AiTaskStorageService
+    private aiTaskStorageService: AiTaskStorageService,
+    private authService: AuthService,
+    private modalService: NzModalService
   ) {}
 
   // ===== UPDATED: File Preview Methods =====
@@ -282,18 +290,34 @@ export class AiTaskGeneratorComponent {
       return;
     }
 
+    const userId = localStorage.getItem('userId');
+    if (!userId) {
+      this.toastService.Error('Không tìm thấy User ID. Vui lòng đăng nhập lại.');
+      return;
+    }
+
     this.isProcessing = true;
     this.currentStep = 1;
 
-    const formData = new FormData();
-    formData.append('file', this.selectedFile);
-
-    this.documentService.uploadDoc(formData)
+    this.aiAgentService.generateProject(this.selectedFile, userId)
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
-        next: (response) => this.handleFileUploaded(response),
-        error: (err) => this.handleError('Tải file thất bại!', err)
+        next: (response) => this.handleProjectGenerated(response.data),
+        error: (err) => this.handleError('AI không thể tạo được công việc từ file này!', err)
       });
+  }
+
+  private handleProjectGenerated(data: GenerateProjectResponse): void {
+    this.isProcessing = false;
+    this.currentStep = 0;
+    this.generatedProject = data;
+    this.isResultModalVisible = true; // Show the modal
+    this.toastService.Success('AI đã tạo công việc thành công!');
+  }
+
+  closeResultModal(): void {
+    this.isResultModalVisible = false;
+    this.generatedProject = null;
   }
 
   private handleFileUploaded(documentModel: DocumentModel): void {
